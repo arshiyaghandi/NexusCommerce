@@ -8,13 +8,21 @@
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
         <module name="eureka" />
+        <module name="api-gateway (1)" />
       </profile>
     </annotationProcessing>
+    <bytecodeTargetLevel>
+      <module name="demo" target="21" />
+      <module name="order-service" target="21" />
+    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
+      <module name="api-gateway (1)" options="-parameters" />
+      <module name="demo" options="-parameters" />
       <module name="eureka" options="-parameters" />
+      <module name="order-service" options="-parameters" />
     </option>
   </component>
 </project>

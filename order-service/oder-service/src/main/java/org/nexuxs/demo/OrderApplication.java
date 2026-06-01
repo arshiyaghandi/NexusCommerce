@@ -1,13 +1,13 @@
-package org.nexuxs.eureka;
+package org.nexuxs.demo;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 @SpringBootApplication
-public class DemoApplication {
+public class OrderApplication {
 
 	public static void main(String[] args) {
-		SpringApplication.run(DemoApplication.class, args);
+		SpringApplication.run(OrderApplication.class, args);
 	}
 
 }
