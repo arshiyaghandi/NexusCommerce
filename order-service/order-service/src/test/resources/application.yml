@@ -1,0 +1,14 @@
+eureka:
+  client:
+    enabled: false
+
+spring:
+  cloud:
+    discovery:
+      enabled: false
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/nexus-realm
+          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs

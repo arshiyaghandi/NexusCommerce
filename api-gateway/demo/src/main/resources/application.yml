@@ -1,15 +1,39 @@
 server:
-  port: 8082
+  port: 8080
 
 spring:
   application:
-    name: order-service
+    name: api-gateway
+  cloud:
+    gateway:
+      default-filters:
+        - TokenRelay
+      routes:
+        - id: order-service
+          uri: lb://order-service
+          predicates:
+            - Path=/api/orders/**
+          filters:
+            - name: RequestRateLimiter
+              args:
+                redis-rate-limiter.replenishRate: 10
+                redis-rate-limiter.burstCapacity: 20
+                redis-rate-limiter.requestedTokens: 1
+        - id: inventory-service
+          uri: lb://inventory-service
+          predicates:
+            - Path=/api/inventory/**
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: http://localhost:8081/realms/nexus-realm
           jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
+  data:
+    redis:
+      host: localhost
+      port: 6380
+      database: 0
 
 eureka:
   client:

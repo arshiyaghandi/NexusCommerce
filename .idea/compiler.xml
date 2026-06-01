@@ -8,10 +8,10 @@
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
         <module name="eureka" />
-        <module name="api-gateway (1)" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
+      <module name="api-gateway (1)" target="21" />
       <module name="demo" target="21" />
       <module name="order-service" target="21" />
     </bytecodeTargetLevel>
