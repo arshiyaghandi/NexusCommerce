@@ -1,0 +1,39 @@
+server:
+  port: 8083
+
+spring:
+  application:
+    name: inventory-service
+
+
+#------------------------------------------------------------------------
+# PostgresSQL
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/nexus_db
+    username: admin
+    password: admin
+#------------------------------------------------------------------------
+# Redis
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 1
+
+#------------------------------------------------------------------------
+# Keycloak
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/nexus-realm
+          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
+
+#------------------------------------------------------------------------
+# Eureka
+eureka:
+  client:
+    service-url:
+      defaultZone: http://localhost:8761/eureka/
+  instance:
+    prefer-ip-address: true

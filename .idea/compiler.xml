@@ -9,19 +9,20 @@
         <module name="api-gateway" />
         <module name="order-service" />
         <module name="eureka" />
+        <module name="inevntoryServivr" />
       </profile>
     </annotationProcessing>
     <bytecodeTargetLevel>
-      <module name="api-gateway (1)" target="21" />
       <module name="demo" target="21" />
+      <module name="inventory-service" target="1.5" />
     </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
-      <module name="api-gateway (1)" options="-parameters" />
       <module name="demo" options="-parameters" />
       <module name="eureka" options="-parameters" />
+      <module name="inevntoryServivr" options="-parameters" />
       <module name="order-service" options="-parameters" />
     </option>
   </component>
