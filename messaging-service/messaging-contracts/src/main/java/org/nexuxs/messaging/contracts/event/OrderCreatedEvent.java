@@ -4,10 +4,12 @@ import java.math.BigDecimal;
 import java.time.Instant;
 
 public record OrderCreatedEvent(
-        String orderNumber,
-        String skuCode,
-        BigDecimal price,
+        Long orderId,
+        String userId,
+        Long productId,
         int quantity,
+        BigDecimal totalPrice,
+        String status,
         Instant createdAt
 ) {
 }

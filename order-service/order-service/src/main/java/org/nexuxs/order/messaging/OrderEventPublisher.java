@@ -2,9 +2,9 @@ package org.nexuxs.order.messaging;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nexuxs.order.data.model.Order;
 import org.nexuxs.messaging.contracts.NexusTopics;
 import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
+import org.nexuxs.order.data.model.Order;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
@@ -24,14 +24,17 @@ public class OrderEventPublisher {
     public Mono<Void> publish(Order order) {
         return Mono.fromRunnable(() -> {
             OrderCreatedEvent event = new OrderCreatedEvent(
-                    order.getOrderNumber(),
-                    order.getSkuCode(),
-                    order.getPrice(),
+                    order.getId(),
+                    order.getUserId(),
+                    order.getProductId(),
                     order.getQuantity(),
+                    order.getTotalPrice(),
+                    order.getStatus().name(),
                     Instant.now()
             );
-            kafkaTemplate.send(NexusTopics.ORDER_CREATED, order.getOrderNumber(), event);
-            log.info("Published {} for order {}", NexusTopics.ORDER_CREATED, order.getOrderNumber());
+            String key = order.getId() != null ? order.getId().toString() : order.getUserId();
+            kafkaTemplate.send(NexusTopics.ORDER_CREATED, key, event);
+            log.info("Published {} for orderId={}", NexusTopics.ORDER_CREATED, order.getId());
         }).subscribeOn(Schedulers.boundedElastic()).then();
     }
 }
