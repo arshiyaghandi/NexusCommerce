@@ -2,27 +2,26 @@
 <project version="4">
   <component name="CompilerConfiguration">
     <annotationProcessing>
+      <profile default="true" name="Default" enabled="true" />
       <profile name="Maven default annotation processors profile" enabled="true">
         <sourceOutputDir name="target/generated-sources/annotations" />
         <sourceTestOutputDir name="target/generated-test-sources/test-annotations" />
         <outputRelativeToContentRoot value="true" />
         <module name="api-gateway" />
+        <module name="discovery-service" />
+        <module name="inventory-service" />
+        <module name="messaging-contracts" />
+        <module name="messaging-service" />
         <module name="order-service" />
-        <module name="eureka" />
-        <module name="inevntoryServivr" />
       </profile>
     </annotationProcessing>
-    <bytecodeTargetLevel>
-      <module name="demo" target="21" />
-      <module name="inventory-service" target="1.5" />
-    </bytecodeTargetLevel>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
-      <module name="demo" options="-parameters" />
-      <module name="eureka" options="-parameters" />
-      <module name="inevntoryServivr" options="-parameters" />
+      <module name="discovery-service" options="-parameters" />
+      <module name="inventory-service" options="-parameters" />
+      <module name="messaging-service" options="-parameters" />
       <module name="order-service" options="-parameters" />
     </option>
   </component>
