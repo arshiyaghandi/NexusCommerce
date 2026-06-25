@@ -1,0 +1,20 @@
+eureka:
+  client:
+    enabled: false
+
+spring:
+  profiles:
+    active: test
+  cloud:
+    discovery:
+      enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.r2dbc.R2dbcAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.r2dbc.R2dbcDataAutoConfiguration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8081/realms/nexus-realm
+          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs

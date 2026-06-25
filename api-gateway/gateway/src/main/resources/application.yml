@@ -24,10 +24,30 @@ spring:
           uri: lb://inventory-service
           predicates:
             - Path=/api/inventory/**
+        - id: product-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/products/**
+        - id: cart-service
+          uri: lb://cart-service
+          predicates:
+            - Path=/api/cart/**
+        - id: payment-service
+          uri: lb://payment-service
+          predicates:
+            - Path=/api/payments/**
+        - id: finance-service
+          uri: lb://finance-service
+          predicates:
+            - Path=/api/finance/**
         - id: messaging-service
           uri: lb://messaging-service
           predicates:
             - Path=/api/messaging/**
+        - id: notification-ws
+          uri: lb:ws://notification-service
+          predicates:
+            - Path=/ws/**
   security:
     oauth2:
       resourceserver:

@@ -3,6 +3,7 @@ package org.nexuxs.order.service;
 import lombok.RequiredArgsConstructor;
 import org.nexuxs.order.client.InventoryClient;
 import org.nexuxs.order.data.dto.OrderRequest;
+import org.nexuxs.order.data.dto.OrderResponse;
 import org.nexuxs.order.data.model.Order;
 import org.nexuxs.order.data.model.OrderStatus;
 import org.nexuxs.order.data.repository.OrderRepository;
@@ -11,6 +12,7 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Service
@@ -20,6 +22,20 @@ public class OrderService {
     private final OrderRepository orderRepository;
     private final InventoryClient inventoryClient;
     private final ObjectProvider<OrderEventPublisher> orderEventPublisherProvider;
+
+    public Flux<OrderResponse> myOrders() {
+        return currentUserId()
+                .flatMapMany(orderRepository::findByUserId)
+                .map(this::toResponse);
+    }
+
+    public Mono<OrderResponse> getOrder(Long orderId) {
+        return currentUserId()
+                .flatMap(userId -> orderRepository.findById(orderId)
+                        .filter(order -> userId.equals(order.getUserId()))
+                        .map(this::toResponse)
+                        .switchIfEmpty(Mono.error(new IllegalStateException("Order not found"))));
+    }
 
     public Mono<String> placeOrder(OrderRequest orderRequest) {
         return currentUserId()
@@ -54,5 +70,17 @@ public class OrderService {
 
     private String toSkuCode(Long productId) {
         return "SKU" + String.format("%03d", productId);
+    }
+
+    private OrderResponse toResponse(Order order) {
+        return new OrderResponse(
+                order.getId(),
+                order.getUserId(),
+                order.getProductId(),
+                order.getQuantity(),
+                order.getTotalPrice(),
+                order.getStatus(),
+                order.getCreatedAt()
+        );
     }
 }
