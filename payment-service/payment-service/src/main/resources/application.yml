@@ -11,7 +11,7 @@ spring:
           issuer-uri: http://localhost:8081/realms/nexus-realm
           jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
   r2dbc:
-    url: r2dbc:postgresql://localhost:5433/nexus_db
+    url: r2dbc:postgresql://localhost:5433/payment_db
     username: admin
     password: admin
   kafka:

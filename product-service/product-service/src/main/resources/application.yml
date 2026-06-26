@@ -5,7 +5,7 @@ spring:
   application:
     name: product-service
   r2dbc:
-    url: r2dbc:postgresql://localhost:5433/nexus_db
+    url: r2dbc:postgresql://localhost:5433/product_db
     username: admin
     password: admin
   security:

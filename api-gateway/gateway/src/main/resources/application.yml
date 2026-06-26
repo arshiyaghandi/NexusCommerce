@@ -6,8 +6,16 @@ spring:
     name: api-gateway
   cloud:
     gateway:
+      httpclient:
+        connect-timeout: 5000
+        response-timeout: 5000s
       default-filters:
         - TokenRelay
+        - name: Retry
+          args:
+            retries: 3
+            methods: GET
+            series: SERVER_ERROR
       routes:
         - id: order-service
           uri: lb://order-service
@@ -18,8 +26,12 @@ spring:
               args:
                 redis-rate-limiter.replenishRate: 10
                 redis-rate-limiter.burstCapacity: 20
-                redis-rate-limiter.requestedTokens: 1
+                requestedTokens: 1
                 key-resolver: "#{@userKeyResolver}"
+            - name: CircuitBreaker
+              args:
+                name: orderCircuitBreaker
+                fallbackUri: forward:/fallback/order
         - id: inventory-service
           uri: lb://inventory-service
           predicates:
@@ -28,10 +40,6 @@ spring:
           uri: lb://product-service
           predicates:
             - Path=/api/products/**
-        - id: cart-service
-          uri: lb://cart-service
-          predicates:
-            - Path=/api/cart/**
         - id: payment-service
           uri: lb://payment-service
           predicates:
@@ -44,41 +52,20 @@ spring:
           uri: lb://messaging-service
           predicates:
             - Path=/api/messaging/**
-        - id: notification-ws
-          uri: lb:ws://notification-service
-          predicates:
-            - Path=/ws/**
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8081/realms/nexus-realm
-          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm/protocol/openid-connect/certs
   data:
     redis:
-      host: localhost
+      host: ${REDIS_HOST:localhost}
       port: 6379
-      database: 0
 
 eureka:
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
-  instance:
-    prefer-ip-address: true
-    instance-id: ${spring.application.name}:${server.port}
-    lease-renewal-interval-in-seconds: 10
-    lease-expiration-duration-in-seconds: 30
-    health-check-url-path: /actuator/health
-
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info
-  endpoint:
-    health:
-      probes:
-        enabled: true
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}

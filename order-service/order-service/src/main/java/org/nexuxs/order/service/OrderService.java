@@ -1,6 +1,7 @@
 package org.nexuxs.order.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.order.client.InventoryClient;
 import org.nexuxs.order.data.dto.OrderRequest;
 import org.nexuxs.order.data.dto.OrderResponse;
@@ -16,6 +17,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 @Service
+@Slf4j
 @RequiredArgsConstructor
 public class OrderService {
 
@@ -49,7 +51,7 @@ public class OrderService {
                 .productId(orderRequest.productId())
                 .quantity(orderRequest.quantity())
                 .totalPrice(orderRequest.totalPrice())
-                .status(OrderStatus.CONFIRMED)
+                .status(OrderStatus.PENDING)
                 .build();
 
         return orderRepository.save(order)
@@ -58,6 +60,34 @@ public class OrderService {
                     Mono<Void> published = publisher != null ? publisher.publish(savedOrder) : Mono.empty();
                     return published.thenReturn("Order placed successfully with Order Id: " + savedOrder.getId());
                 });
+    }
+
+    /**
+     * Saga step: drives an order to its terminal status in response to a payment outcome.
+     * A successful payment completes the order; any other outcome cancels it. The transition
+     * is idempotent — orders already in a terminal state are left untouched.
+     */
+    public Mono<Order> applyPaymentOutcome(Long orderId, boolean paymentSucceeded) {
+        OrderStatus target = paymentSucceeded ? OrderStatus.COMPLETED : OrderStatus.CANCELLED;
+        return orderRepository.findById(orderId)
+                .switchIfEmpty(Mono.error(new IllegalStateException(
+                        "Cannot apply payment outcome: order not found, orderId=" + orderId)))
+                .flatMap(order -> {
+                    if (isTerminal(order.getStatus())) {
+                        log.info("Skipping payment outcome for orderId={}, already terminal status={}",
+                                orderId, order.getStatus());
+                        return Mono.just(order);
+                    }
+                    order.setStatus(target);
+                    return orderRepository.save(order)
+                            .doOnNext(saved -> log.info("Order {} transitioned to {}", orderId, target));
+                });
+    }
+
+    private boolean isTerminal(OrderStatus status) {
+        return status == OrderStatus.COMPLETED
+                || status == OrderStatus.CANCELLED
+                || status == OrderStatus.REJECTED;
     }
 
     private Mono<String> currentUserId() {
