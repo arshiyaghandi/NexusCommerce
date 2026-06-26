@@ -26,4 +26,12 @@ public class KafkaTopicConfig {
                 .replicas(1)
                 .build();
     }
+
+    @Bean
+    public NewTopic paymentCompletedTopic() {
+        return TopicBuilder.name(NexusTopics.PAYMENT_COMPLETED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
 }

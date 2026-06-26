@@ -18,7 +18,8 @@ public class OrderCreatedEventConsumer {
             containerFactory = "orderCreatedListenerFactory"
     )
     public void consume(OrderCreatedEvent event) {
-        log.info("[messaging-broker] order.created | orderNumber={} sku={} qty={} price={}",
-                event.orderNumber(), event.skuCode(), event.quantity(), event.price());
+        log.info("[messaging-broker] order.created | orderId={} user={} product={} qty={} total={} status={}",
+                event.orderId(), event.userId(), event.productId(), event.quantity(),
+                event.totalPrice(), event.status());
     }
 }

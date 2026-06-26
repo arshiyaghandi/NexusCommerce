@@ -1,0 +1,13 @@
+eureka:
+  client:
+    enabled: false
+
+spring:
+  profiles:
+    active: test
+  cloud:
+    discovery:
+      enabled: false
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration

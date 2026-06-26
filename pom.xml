@@ -15,7 +15,7 @@
     <artifactId>nexus-commerce</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-
+ی
     <name>NexusCommerce</name>
     <description>NexusCommerce Microservices Platform</description>
 
@@ -25,6 +25,11 @@
         <module>api-gateway/gateway</module>
         <module>order-service/order-service</module>
         <module>inventory-service/inventory-service</module>
+        <module>product-service/product-service</module>
+        <module>cart-service/cart-service</module>
+        <module>payment-service/payment-service</module>
+        <module>notification-service/notification-service</module>
+        <module>finance-service/finance-service</module>
     </modules>
 
     <properties>

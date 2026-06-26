@@ -28,7 +28,7 @@ services:
     container_name: nexus_keycloak
     environment:
       KC_DB: postgres
-      KC_DB_URL: jdbc:postgresql://postgres:5432/nexus_db
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak_db
       KC_DB_USERNAME: admin
       KC_DB_PASSWORD: admin
       KEYCLOAK_ADMIN: admin
@@ -42,7 +42,7 @@ services:
       - nexus_network
 
   kafka:
-    image: apache/kafka:3.9.0
+    image: apache/kafka:latest
     container_name: nexus_kafka
     ports:
       - "9092:9092"
