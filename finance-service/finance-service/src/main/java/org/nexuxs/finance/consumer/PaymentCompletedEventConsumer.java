@@ -19,12 +19,15 @@ public class PaymentCompletedEventConsumer {
 
     @KafkaListener(
             topics = NexusTopics.PAYMENT_COMPLETED,
-            groupId = "finance-service",
-            containerFactory = "paymentCompletedListenerFactory"
+            groupId = "finance-service"
     )
     public void consume(PaymentCompletedEvent event) {
         log.info("[finance] payment.completed | paymentId={} orderId={} user={} amount={}",
                 event.paymentId(), event.orderId(), event.userId(), event.amount());
-        financeService.savePaymentTransaction(event);
+
+        financeService.savePaymentTransaction(event).subscribe(
+                null,
+                error -> log.error("Failed to save transaction for Order: {}", event.orderId(), error)
+        );
     }
 }

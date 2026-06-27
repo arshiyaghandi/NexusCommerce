@@ -24,8 +24,5 @@ public class InventoryAPI {
         return inventoryService.getStock(skuCode);
     }
 
-    @PostMapping("/reserve")
-    public Mono<Void> reserveStock(@RequestBody ReserveRequest request) {
-        return inventoryService.reserveStock(request);
-    }
+    
 }
