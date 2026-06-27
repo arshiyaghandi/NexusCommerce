@@ -2,7 +2,6 @@ package org.nexuxs.order.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nexuxs.order.client.InventoryClient;
 import org.nexuxs.order.data.dto.OrderRequest;
 import org.nexuxs.order.data.dto.OrderResponse;
 import org.nexuxs.order.data.model.Order;
@@ -22,7 +21,6 @@ import reactor.core.publisher.Mono;
 public class OrderService {
 
     private final OrderRepository orderRepository;
-    private final InventoryClient inventoryClient;
     private final ObjectProvider<OrderEventPublisher> orderEventPublisherProvider;
 
     public Flux<OrderResponse> myOrders() {
@@ -41,8 +39,7 @@ public class OrderService {
 
     public Mono<String> placeOrder(OrderRequest orderRequest) {
         return currentUserId()
-                .flatMap(userId -> inventoryClient.reserveStock(toSkuCode(orderRequest.productId()), orderRequest.quantity())
-                        .then(saveOrder(userId, orderRequest)));
+                .flatMap(userId -> saveOrder(userId, orderRequest));
     }
 
     private Mono<String> saveOrder(String userId, OrderRequest orderRequest) {
@@ -62,11 +59,6 @@ public class OrderService {
                 });
     }
 
-    /**
-     * Saga step: drives an order to its terminal status in response to a payment outcome.
-     * A successful payment completes the order; any other outcome cancels it. The transition
-     * is idempotent — orders already in a terminal state are left untouched.
-     */
     public Mono<Order> applyPaymentOutcome(Long orderId, boolean paymentSucceeded) {
         OrderStatus target = paymentSucceeded ? OrderStatus.COMPLETED : OrderStatus.CANCELLED;
         return orderRepository.findById(orderId)
@@ -96,10 +88,6 @@ public class OrderService {
                 .cast(JwtAuthenticationToken.class)
                 .map(auth -> auth.getToken().getSubject())
                 .switchIfEmpty(Mono.error(new IllegalStateException("Missing authentication for order placement")));
-    }
-
-    private String toSkuCode(Long productId) {
-        return "SKU" + String.format("%03d", productId);
     }
 
     private OrderResponse toResponse(Order order) {

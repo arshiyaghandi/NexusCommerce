@@ -15,10 +15,5 @@ import reactor.core.publisher.Mono;
 @RequiredArgsConstructor
 public class PaymentAPI {
 
-    private final PaymentService paymentService;
 
-    @PostMapping
-    public Mono<Payment> processPayment(@RequestBody PaymentRequest request) {
-        return paymentService.processPayment(request);
-    }
 }

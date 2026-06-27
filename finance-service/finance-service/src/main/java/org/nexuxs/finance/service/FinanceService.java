@@ -1,6 +1,7 @@
 package org.nexuxs.finance.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.finance.data.dto.FinanceSummaryResponse;
 import org.nexuxs.finance.data.model.Transaction;
 import org.nexuxs.finance.data.model.TransactionType;
@@ -16,18 +17,22 @@ import java.math.BigDecimal;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class FinanceService {
 
     private final TransactionRepository transactionRepository;
 
-    public void savePaymentTransaction(PaymentCompletedEvent event) {
+    public Mono<Void> savePaymentTransaction(PaymentCompletedEvent event) {
         Transaction transaction = Transaction.builder()
                 .orderId(event.orderId())
                 .userId(event.userId())
                 .amount(event.amount())
                 .type(TransactionType.PAYMENT)
                 .build();
-        transactionRepository.save(transaction).block();
+
+        return transactionRepository.save(transaction)
+                .doOnSuccess(t -> log.info("Ledger updated: Transaction saved for Order: {}", event.orderId()))
+                .then();
     }
 
     public Flux<Transaction> getCurrentUserTransactions() {
