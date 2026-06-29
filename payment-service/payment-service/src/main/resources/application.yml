@@ -48,3 +48,7 @@ management:
 nexus:
   kafka:
     enabled: true
+  payment:
+    # Payments with an amount strictly greater than this are declined (Saga failure path).
+    # Set high by default so normal orders succeed; lower it to test compensation.
+    decline-above: 100000

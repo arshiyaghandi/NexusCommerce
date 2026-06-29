@@ -59,15 +59,36 @@ public class OrderService {
                 });
     }
 
+    /**
+     * Saga: applies the outcome of the payment step. Success completes the order,
+     * failure cancels it (the reserved stock is compensated independently by
+     * inventory-service reacting to the same {@code payment.failed} event).
+     */
     public Mono<Order> applyPaymentOutcome(Long orderId, boolean paymentSucceeded) {
-        OrderStatus target = paymentSucceeded ? OrderStatus.COMPLETED : OrderStatus.CANCELLED;
+        return transitionTo(orderId, paymentSucceeded ? OrderStatus.COMPLETED : OrderStatus.CANCELLED);
+    }
+
+    /**
+     * Saga: rejects an order whose inventory reservation failed. No stock was ever
+     * decremented, so there is nothing to compensate — the order simply never qualified.
+     */
+    public Mono<Order> applyInventoryFailure(Long orderId) {
+        return transitionTo(orderId, OrderStatus.REJECTED);
+    }
+
+    /**
+     * Idempotent terminal-state transition. Orders that already reached a terminal
+     * status are left untouched, so redelivered Saga events (Kafka at-least-once) are
+     * safe no-ops.
+     */
+    private Mono<Order> transitionTo(Long orderId, OrderStatus target) {
         return orderRepository.findById(orderId)
                 .switchIfEmpty(Mono.error(new IllegalStateException(
-                        "Cannot apply payment outcome: order not found, orderId=" + orderId)))
+                        "Cannot transition order: not found, orderId=" + orderId)))
                 .flatMap(order -> {
                     if (isTerminal(order.getStatus())) {
-                        log.info("Skipping payment outcome for orderId={}, already terminal status={}",
-                                orderId, order.getStatus());
+                        log.info("Skipping transition to {} for orderId={}, already terminal status={}",
+                                target, orderId, order.getStatus());
                         return Mono.just(order);
                     }
                     order.setStatus(target);

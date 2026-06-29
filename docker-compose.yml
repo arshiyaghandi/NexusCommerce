@@ -5,11 +5,11 @@ services:
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: admin
-      POSTGRES_DB: nexus_db
     ports:
       - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     networks:
       - nexus_network
     restart: unless-stopped
@@ -37,7 +37,8 @@ services:
     ports:
       - "8081:8080"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_started
     networks:
       - nexus_network
 
@@ -78,7 +79,7 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
     depends_on:
       kafka:
-        condition: service_started
+        condition: service_healthy
     networks:
       - nexus_network
     restart: unless-stopped

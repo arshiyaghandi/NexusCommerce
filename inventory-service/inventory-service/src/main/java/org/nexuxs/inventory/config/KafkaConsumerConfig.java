@@ -1,9 +1,7 @@
-package org.nexuxs.order.config;
+package org.nexuxs.inventory.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
-import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
-import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
 import org.nexuxs.messaging.contracts.event.PaymentFailedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -17,50 +15,28 @@ import org.springframework.kafka.support.serializer.JsonDeserializer;
 import java.util.Map;
 
 /**
- * Kafka consumer infrastructure for the order-service Saga listeners.
+ * Kafka consumer infrastructure for inventory-service Saga compensation.
  *
- * <p>The order-service reacts to three downstream Saga events:
- * <ul>
- *     <li>{@code nexus.payment.completed} – closes the order (COMPLETED / CANCELLED)</li>
- *     <li>{@code inventory.failed.topic} – rejects the order (stock never reserved)</li>
- *     <li>{@code payment.failed.topic} – cancels the order (stock was reserved, then released)</li>
- * </ul>
- *
- * <p>Each event gets a dedicated typed {@link ConcurrentKafkaListenerContainerFactory}
- * built from the shared {@link #buildConsumerFactory(Class)} helper, which pins the
- * deserialization target explicitly. This is required because producers across the
- * platform disable type headers ({@code spring.json.add.type.headers=false}), so the
- * consumer cannot infer the payload type from the record.
+ * <p>inventory-service listens to {@code payment.failed.topic} to release stock that was
+ * reserved before payment failed. The deserialization target is pinned explicitly because
+ * producers disable type headers ({@code spring.json.add.type.headers=false}); the
+ * service's {@code application.yml} therefore needs no consumer block.
  */
 @Configuration
 @Profile("!test")
 public class KafkaConsumerConfig {
 
-    private static final String GROUP_ID = "order-service";
+    private static final String GROUP_ID = "inventory-service";
     private static final String CONTRACTS_PACKAGE = "org.nexuxs.messaging.contracts.event";
 
     @Value("${spring.kafka.bootstrap-servers}")
     private String bootstrapServers;
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> paymentCompletedListenerFactory() {
-        return listenerFactory(PaymentCompletedEvent.class);
-    }
-
-    @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, InventoryFailedEvent> inventoryFailedListenerFactory() {
-        return listenerFactory(InventoryFailedEvent.class);
-    }
-
-    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory() {
-        return listenerFactory(PaymentFailedEvent.class);
-    }
-
-    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType) {
-        ConcurrentKafkaListenerContainerFactory<String, T> factory =
+        ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(buildConsumerFactory(eventType));
+        factory.setConsumerFactory(buildConsumerFactory(PaymentFailedEvent.class));
         return factory;
     }
 
