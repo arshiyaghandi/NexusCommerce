@@ -3,18 +3,23 @@ package org.nexuxs.inventory.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.inventory.data.dto.InventoryResponse;
+import org.nexuxs.inventory.data.model.ProcessedCompensation;
 import org.nexuxs.inventory.data.repository.InventoryRepository;
 import org.nexuxs.inventory.messaging.InventoryEventPublisher;
 import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.messaging.contracts.event.InventoryReservedEvent;
 import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
@@ -23,6 +28,7 @@ public class InventoryService {
 
     private final InventoryRepository inventoryRepository;
     private final ObjectProvider<InventoryEventPublisher> publisherProvider;
+    private final R2dbcEntityTemplate entityTemplate;
 
     public Mono<InventoryResponse> getStock(String skuCode) {
         return inventoryRepository.findBySkuCode(skuCode)
@@ -64,6 +70,36 @@ public class InventoryService {
                             .doOnSuccess(saved -> log.info("Compensating action: Released {} units of {} back to inventory.", quantity, skuCode));
                 })
                 .then();
+    }
+
+    /**
+     * Saga compensation entry point for a failed payment: releases the reserved stock,
+     * exactly once. The {@code processed_compensations} insert is the idempotency gate —
+     * because {@code order_id} is the primary key, a redelivered {@code payment.failed}
+     * event (Kafka at-least-once) collides on insert and is skipped, so stock is never
+     * credited twice. {@link #releaseStock(Long, int)} only runs after a fresh insert.
+     */
+    public Mono<Void> compensateReservation(Long orderId, Long productId, int quantity) {
+        ProcessedCompensation marker = ProcessedCompensation.builder()
+                .orderId(orderId)
+                .processedAt(LocalDateTime.now())
+                .build();
+
+        return entityTemplate.insert(ProcessedCompensation.class).using(marker)
+                .then(Mono.defer(() -> {
+                    log.info("Compensating reservation for orderId={}, productId={}, quantity={}",
+                            orderId, productId, quantity);
+                    return releaseStock(productId, quantity);
+                }))
+                .onErrorResume(this::isDuplicateCompensation, error -> {
+                    log.info("Skipping duplicate compensation for orderId={} (already processed)", orderId);
+                    return Mono.empty();
+                });
+    }
+
+    private boolean isDuplicateCompensation(Throwable error) {
+        return error instanceof DuplicateKeyException
+                || error instanceof DataIntegrityViolationException;
     }
 
     private Mono<Void> publishSuccess(OrderCreatedEvent event, int remainingQuantity) {

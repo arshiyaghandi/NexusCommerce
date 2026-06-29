@@ -10,9 +10,11 @@ import org.nexuxs.payment.data.model.PaymentStatus;
 import org.nexuxs.payment.data.repository.PaymentRepository;
 import org.nexuxs.payment.messaging.PaymentEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Service
@@ -23,11 +25,20 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     private final ObjectProvider<PaymentEventPublisher> publisherProvider;
 
+    /**
+     * Authorization threshold: a payment whose amount is strictly greater than this is
+     * declined. Defaults high so normal orders succeed; lower it (config) to exercise the
+     * payment-failure Saga branch end-to-end. A real funds/balance check would replace this.
+     */
+    @Value("${nexus.payment.decline-above:100000}")
+    private BigDecimal declineAbove;
+
     public Mono<Void> processPayment(InventoryReservedEvent event) {
         log.info("Saga Execution: Processing payment for Order: {}, User: {}, Amount: {}",
                 event.orderId(), event.userId(), event.totalPrice());
 
-        boolean hasSufficientFunds = true;
+        boolean hasSufficientFunds = event.totalPrice() != null
+                && event.totalPrice().compareTo(declineAbove) <= 0;
 
         if (hasSufficientFunds) {
             Payment payment = Payment.builder()
