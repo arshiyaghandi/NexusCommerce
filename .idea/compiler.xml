@@ -9,22 +9,24 @@
         <outputRelativeToContentRoot value="true" />
         <module name="messaging-service" />
         <module name="cart-service" />
-        <module name="inventory-service" />
         <module name="messaging-contracts" />
-        <module name="payment-service" />
+        <module name="auth" />
         <module name="finance-service" />
-        <module name="api-gateway" />
         <module name="inevntoryService" />
         <module name="product-service" />
-        <module name="order-service" />
         <module name="discovery-service" />
         <module name="notification-service" />
+        <module name="inventory-service" />
+        <module name="payment-service" />
+        <module name="api-gateway" />
+        <module name="order-service" />
       </profile>
     </annotationProcessing>
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_OVERRIDE">
       <module name="api-gateway" options="-parameters" />
+      <module name="auth" options="-parameters" />
       <module name="cart-service" options="-parameters" />
       <module name="discovery-service" options="-parameters" />
       <module name="finance-service" options="-parameters" />
