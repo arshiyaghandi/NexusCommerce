@@ -30,6 +30,7 @@
         <module>payment-service/payment-service</module>
         <module>notification-service/notification-service</module>
         <module>finance-service/finance-service</module>
+        <module>auth-service/auth</module>
     </modules>
 
     <properties>
