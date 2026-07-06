@@ -2,10 +2,15 @@ package org.nexuxs.order.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.nexuxs.order.data.dto.OrderRequest;
+import org.nexuxs.order.client.CartClient;
+import org.nexuxs.order.client.ProductClient;
+import org.nexuxs.order.data.dto.CartItemDto;
+import org.nexuxs.order.data.dto.OrderLineResponse;
 import org.nexuxs.order.data.dto.OrderResponse;
 import org.nexuxs.order.data.model.Order;
+import org.nexuxs.order.data.model.OrderLine;
 import org.nexuxs.order.data.model.OrderStatus;
+import org.nexuxs.order.data.repository.OrderLineRepository;
 import org.nexuxs.order.data.repository.OrderRepository;
 import org.nexuxs.order.messaging.OrderEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
@@ -15,48 +20,106 @@ import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
+import java.util.List;
+
 @Service
 @Slf4j
 @RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
+    private final OrderLineRepository orderLineRepository;
+    private final CartClient cartClient;
+    private final ProductClient productClient;
     private final ObjectProvider<OrderEventPublisher> orderEventPublisherProvider;
 
     public Flux<OrderResponse> myOrders() {
         return currentUserId()
-                .flatMapMany(orderRepository::findByUserId)
-                .map(this::toResponse);
+                .flatMapMany(userId -> orderRepository.findByUserId(userId)
+                        .flatMap(order -> loadOrderLines(order)
+                                .map(lines -> toResponse(order, lines))));
     }
 
     public Mono<OrderResponse> getOrder(Long orderId) {
         return currentUserId()
                 .flatMap(userId -> orderRepository.findById(orderId)
                         .filter(order -> userId.equals(order.getUserId()))
-                        .map(this::toResponse)
+                        .flatMap(order -> loadOrderLines(order)
+                                .map(lines -> toResponse(order, lines)))
                         .switchIfEmpty(Mono.error(new IllegalStateException("Order not found"))));
     }
 
-    public Mono<String> placeOrder(OrderRequest orderRequest) {
+    /**
+     * Checkout flow: reads the authenticated user's cart, validates prices against
+     * product-service (source-of-truth), persists Order + OrderLines, publishes
+     * {@code OrderCreatedEvent} to kick off the Saga, and clears the cart.
+     */
+    public Mono<String> placeOrder() {
         return currentUserId()
-                .flatMap(userId -> saveOrder(userId, orderRequest));
+                .flatMap(userId -> cartClient.getCart()
+                        .flatMap(cartItems -> {
+                            if (cartItems.isEmpty()) {
+                                return Mono.error(new IllegalStateException("Cart is empty"));
+                            }
+                            return validateAndBuildOrder(userId, cartItems);
+                        })
+                        .flatMap(savedOrder -> {
+                            OrderEventPublisher publisher = orderEventPublisherProvider.getIfAvailable();
+                            Mono<Void> published = publisher != null
+                                    ? publisher.publish(savedOrder) : Mono.empty();
+                            return published.thenReturn(
+                                    "Order placed successfully with Order Id: " + savedOrder.getId());
+                        })
+                        .flatMap(message -> cartClient.clearCart().thenReturn(message)));
     }
 
-    private Mono<String> saveOrder(String userId, OrderRequest orderRequest) {
-        Order order = Order.builder()
-                .userId(userId)
-                .productId(orderRequest.productId())
-                .quantity(orderRequest.quantity())
-                .totalPrice(orderRequest.totalPrice())
-                .status(OrderStatus.PENDING)
-                .build();
+    private Mono<Order> validateAndBuildOrder(String userId, List<CartItemDto> cartItems) {
+        // Validate each product exists and compute server-side total
+        return Flux.fromIterable(cartItems)
+                .flatMap(cartItem -> productClient.getProduct(cartItem.productId())
+                        .map(product -> {
+                            log.info("Price check: cart productId={} cartPrice={}, serverPrice={}",
+                                    cartItem.productId(), cartItem.unitPrice(), product.price());
+                            return new ValidatedItem(
+                                    cartItem.productId(),
+                                    cartItem.quantity(),
+                                    product.price());
+                        }))
+                .collectList()
+                .flatMap(validatedItems -> {
+                    BigDecimal totalPrice = validatedItems.stream()
+                            .map(vi -> vi.unitPrice().multiply(BigDecimal.valueOf(vi.quantity())))
+                            .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return orderRepository.save(order)
-                .flatMap(savedOrder -> {
-                    OrderEventPublisher publisher = orderEventPublisherProvider.getIfAvailable();
-                    Mono<Void> published = publisher != null ? publisher.publish(savedOrder) : Mono.empty();
-                    return published.thenReturn("Order placed successfully with Order Id: " + savedOrder.getId());
+                    Order order = Order.builder()
+                            .userId(userId)
+                            .totalPrice(totalPrice)
+                            .status(OrderStatus.PENDING)
+                            .build();
+
+                    return orderRepository.save(order)
+                            .flatMap(savedOrder -> saveOrderLines(savedOrder.getId(), validatedItems)
+                                    .then()
+                                    .thenReturn(savedOrder));
                 });
+    }
+
+    private Flux<OrderLine> saveOrderLines(Long orderId, List<ValidatedItem> items) {
+        return Flux.fromIterable(items)
+                .map(vi -> OrderLine.builder()
+                        .orderId(orderId)
+                        .productId(vi.productId())
+                        .quantity(vi.quantity())
+                        .unitPrice(vi.unitPrice())
+                        .build())
+                .flatMap(orderLineRepository::save);
+    }
+
+    private Mono<List<OrderLineResponse>> loadOrderLines(Order order) {
+        return orderLineRepository.findByOrderId(order.getId())
+                .map(line -> new OrderLineResponse(line.getProductId(), line.getQuantity(), line.getUnitPrice()))
+                .collectList();
     }
 
     /**
@@ -111,15 +174,17 @@ public class OrderService {
                 .switchIfEmpty(Mono.error(new IllegalStateException("Missing authentication for order placement")));
     }
 
-    private OrderResponse toResponse(Order order) {
+    private OrderResponse toResponse(Order order, List<OrderLineResponse> lines) {
         return new OrderResponse(
                 order.getId(),
                 order.getUserId(),
-                order.getProductId(),
-                order.getQuantity(),
                 order.getTotalPrice(),
                 order.getStatus(),
-                order.getCreatedAt()
+                order.getCreatedAt(),
+                lines
         );
+    }
+
+    private record ValidatedItem(Long productId, int quantity, BigDecimal unitPrice) {
     }
 }

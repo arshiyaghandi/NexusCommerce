@@ -18,7 +18,7 @@ public class InventoryReservedEventConsumer {
             containerFactory = "inventoryReservedListenerFactory"
     )
     public void consume(InventoryReservedEvent event) {
-        log.info("[messaging-broker] inventory.reserved | sku={} reserved={} remaining={}",
-                event.skuCode(), event.reservedQuantity(), event.remainingQuantity());
+        log.info("[messaging-broker] inventory.reserved | sku={} quantity={} remaining={}",
+                event.skuCode(), event.quantity(), event.remainingQuantity());
     }
 }

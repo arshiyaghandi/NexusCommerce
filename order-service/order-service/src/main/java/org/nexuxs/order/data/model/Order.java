@@ -22,8 +22,6 @@ public class Order {
     @Id
     private Long id;
     private String userId;
-    private Long productId;
-    private Integer quantity;
     private BigDecimal totalPrice;
     private OrderStatus status;
 

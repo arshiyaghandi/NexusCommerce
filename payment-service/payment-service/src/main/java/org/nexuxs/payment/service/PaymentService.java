@@ -3,6 +3,7 @@ package org.nexuxs.payment.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.messaging.contracts.event.InventoryReservedEvent;
+import org.nexuxs.messaging.contracts.event.OrderLineRecord;
 import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
 import org.nexuxs.messaging.contracts.event.PaymentFailedEvent;
 import org.nexuxs.payment.data.model.Payment;
@@ -16,6 +17,7 @@ import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -77,11 +79,13 @@ public class PaymentService {
         if (publisher == null) return Mono.empty();
 
         Long productId = Long.parseLong(event.skuCode().replace("SKU", ""));
+        List<OrderLineRecord> items = List.of(new OrderLineRecord(productId, event.quantity(), null));
 
         PaymentFailedEvent failedEvent = new PaymentFailedEvent(
                 event.orderId(),
                 productId,
-                event.reservedQuantity(),
+                event.quantity(),
+                items,
                 reason,
                 Instant.now()
         );
