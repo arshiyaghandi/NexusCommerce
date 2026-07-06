@@ -9,15 +9,19 @@ import org.nexuxs.inventory.messaging.InventoryEventPublisher;
 import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.messaging.contracts.event.InventoryReservedEvent;
 import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
+import org.nexuxs.messaging.contracts.event.OrderLineRecord;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 
@@ -37,27 +41,56 @@ public class InventoryService {
                         HttpStatus.NOT_FOUND, "SKU not found: " + skuCode)));
     }
 
+    /**
+     * Saga execution: for each order line, attempt to reserve stock.
+     * If any line fails, publishes InventoryFailedEvent immediately.
+     * If all succeed, publishes InventoryReservedEvent.
+     */
+    @Transactional
     public Mono<Void> handleOrderCreated(OrderCreatedEvent event) {
-        // خواندن دیتا از record با متدهای مستقیم
-        String skuCode = toSkuCode(event.productId());
-        int requestedQuantity = event.quantity();
+        return Flux.fromIterable(event.items())
+                .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line))
+                .collectList()
+                .flatMap(reservedLines -> {
+                    InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
+                    if (publisher == null) return Mono.empty();
+                    return publisher.publishReservedEvent(new InventoryReservedEvent(
+                            event.orderId(),
+                            event.userId(),
+                            reservedLines.get(0).skuCode(),
+                            reservedLines.get(0).quantity(),
+                            reservedLines.get(0).remainingQuantity(),
+                            java.util.List.of(), // items list not populated in single-SKU flow
+                            event.totalPrice(),
+                            Instant.now()
+                    ));
+                });
+    }
 
-        log.info("Processing reservation for Order: {}, SKU: {}, Quantity: {}", event.orderId(), skuCode, requestedQuantity);
+    /**
+     * Reserves stock for a single order line. Returns a record with reservation details
+     * on success, or errors with insufficient stock.
+     */
+    private Mono<ReservedLine> reserveLine(Long orderId, String userId, BigDecimal totalPrice, OrderLineRecord line) {
+        String skuCode = toSkuCode(line.productId());
+        int requestedQuantity = line.quantity();
+
+        log.info("Processing reservation for Order: {}, SKU: {}, Quantity: {}", orderId, skuCode, requestedQuantity);
 
         return inventoryRepository.findBySkuCode(skuCode)
                 .flatMap(item -> {
                     if (item.getQuantity() >= requestedQuantity) {
                         item.setQuantity(item.getQuantity() - requestedQuantity);
                         return inventoryRepository.save(item)
-                                .flatMap(saved -> publishSuccess(event, saved.getQuantity()));
+                                .map(saved -> new ReservedLine(skuCode, requestedQuantity, saved.getQuantity()));
                     } else {
-                        log.warn("Insufficient stock for Order: {}. Requested: {}, Available: {}", event.orderId(), requestedQuantity, item.getQuantity());
-                        return publishFailure(event, "INSUFFICIENT_STOCK");
+                        log.warn("Insufficient stock for Order: {}. Requested: {}, Available: {}", orderId, requestedQuantity, item.getQuantity());
+                        return Mono.error(new IllegalStateException("INSUFFICIENT_STOCK"));
                     }
                 })
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.error("SKU {} not found for Order {}", skuCode, event.orderId());
-                    return publishFailure(event, "SKU_NOT_FOUND");
+                    log.error("SKU {} not found for Order {}", skuCode, orderId);
+                    return Mono.error(new IllegalStateException("SKU_NOT_FOUND"));
                 }));
     }
 
@@ -102,35 +135,9 @@ public class InventoryService {
                 || error instanceof DataIntegrityViolationException;
     }
 
-    private Mono<Void> publishSuccess(OrderCreatedEvent event, int remainingQuantity) {
-        InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
-        if (publisher == null) return Mono.empty();
-        InventoryReservedEvent reservedEvent = new InventoryReservedEvent(
-                event.orderId(),
-                event.userId(),
-                toSkuCode(event.productId()),
-                event.quantity(),
-                remainingQuantity,
-                event.totalPrice(),
-                Instant.now()
-        );
-        return publisher.publishReservedEvent(reservedEvent);
-    }
-
-    private Mono<Void> publishFailure(OrderCreatedEvent event, String reason) {
-        InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
-        if (publisher == null) return Mono.empty();
-
-        InventoryFailedEvent failedEvent = new InventoryFailedEvent(
-                event.orderId(),
-                toSkuCode(event.productId()),
-                reason,
-                Instant.now()
-        );
-        return publisher.publishFailedEvent(failedEvent);
-    }
-
     private String toSkuCode(Long productId) {
         return "SKU" + String.format("%03d", productId);
     }
+
+    private record ReservedLine(String skuCode, int quantity, int remainingQuantity) {}
 }

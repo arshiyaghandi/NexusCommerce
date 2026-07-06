@@ -2,6 +2,7 @@ package org.nexuxs.inventory.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
 import org.nexuxs.messaging.contracts.event.PaymentFailedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -15,12 +16,18 @@ import org.springframework.kafka.support.serializer.JsonDeserializer;
 import java.util.Map;
 
 /**
- * Kafka consumer infrastructure for inventory-service Saga compensation.
+ * Kafka consumer infrastructure for inventory-service's role in the Saga.
  *
- * <p>inventory-service listens to {@code payment.failed.topic} to release stock that was
- * reserved before payment failed. The deserialization target is pinned explicitly because
- * producers disable type headers ({@code spring.json.add.type.headers=false}); the
- * service's {@code application.yml} therefore needs no consumer block.
+ * <p>inventory-service listens to two events:
+ * <ul>
+ *     <li>{@code nexus.order.created} – the first Saga hop: reserve stock and publish
+ *         {@code nexus.inventory.reserved} (or {@code inventory.failed.topic}).</li>
+ *     <li>{@code payment.failed.topic} – Saga compensation: release stock that was reserved
+ *         before payment failed.</li>
+ * </ul>
+ * The deserialization target is pinned explicitly for each event because producers disable
+ * type headers ({@code spring.json.add.type.headers=false}); the service's
+ * {@code application.yml} therefore needs no consumer block.
  */
 @Configuration
 @Profile("!test")
@@ -33,10 +40,19 @@ public class KafkaConsumerConfig {
     private String bootstrapServers;
 
     @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderCreatedListenerFactory() {
+        return listenerFactory(OrderCreatedEvent.class);
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
+        return listenerFactory(PaymentFailedEvent.class);
+    }
+
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType) {
+        ConcurrentKafkaListenerContainerFactory<String, T> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
-        factory.setConsumerFactory(buildConsumerFactory(PaymentFailedEvent.class));
+        factory.setConsumerFactory(buildConsumerFactory(eventType));
         return factory;
     }
 

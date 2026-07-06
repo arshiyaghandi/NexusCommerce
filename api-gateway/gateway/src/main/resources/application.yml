@@ -8,7 +8,7 @@ spring:
     gateway:
       httpclient:
         connect-timeout: 5000
-        response-timeout: 5000s
+        response-timeout: 5s
       default-filters:
         - TokenRelay
         - name: Retry
