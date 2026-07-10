@@ -40,6 +40,10 @@ spring:
           uri: lb://product-service
           predicates:
             - Path=/api/products/**
+        - id: cart-service
+          uri: lb://cart-service
+          predicates:
+            - Path=/api/cart/**
         - id: payment-service
           uri: lb://payment-service
           predicates:
@@ -52,6 +56,10 @@ spring:
           uri: lb://messaging-service
           predicates:
             - Path=/api/messaging/**
+        - id: notification-service
+          uri: lb://notification-service
+          predicates:
+            - Path=/ws/**
   security:
     oauth2:
       resourceserver:
