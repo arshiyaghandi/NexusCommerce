@@ -60,13 +60,67 @@ export default function Orders() {
           {orders.map(order => (
             <div key={order.id} className="glass" style={{padding: '1.5rem'}}>
               <div className="flex-between" style={{marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem'}}>
-                <div>
+                <div style={{display: 'flex', flexDirection: 'column', gap: '0.25rem'}}>
                   <span className="text-muted" style={{fontSize: '0.875rem'}}>Order ID: #{order.id}</span>
-                  <div style={{marginTop: '0.25rem'}}>{new Date(order.createdAt).toLocaleString()}</div>
+                  <div style={{marginTop: '0.25rem', fontWeight: '500'}}>{new Date(order.createdAt).toLocaleString()}</div>
                 </div>
-                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem', color: getStatusColor(order.status), fontWeight: '500'}}>
-                  {getStatusIcon(order.status)}
-                  {order.status}
+              </div>
+              
+              {/* Stepper UI */}
+              <div style={{ marginBottom: '2rem', padding: '1rem 0' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
+                  {/* Progress Line */}
+                  <div style={{ 
+                    position: 'absolute', top: '50%', left: '10%', right: '10%', height: '2px', 
+                    background: 'var(--glass-border)', zIndex: 0, transform: 'translateY(-50%)'
+                  }}>
+                    <div style={{
+                      height: '100%', background: getStatusColor(order.status),
+                      width: order.status === 'COMPLETED' ? '100%' : order.status === 'CONFIRMED' ? '50%' : order.status === 'PENDING' ? '0%' : '100%',
+                      transition: 'width 0.5s ease'
+                    }}></div>
+                  </div>
+
+                  {/* Step 1: PENDING */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, gap: '0.5rem' }}>
+                    <div style={{ 
+                      width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(order.status) ? 'var(--accent-primary)' : 'var(--glass-bg)',
+                      border: '2px solid', borderColor: ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(order.status) ? 'var(--accent-primary)' : 'var(--glass-border)',
+                      color: ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(order.status) ? '#fff' : 'var(--text-muted)'
+                    }}>
+                      <Clock size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: ['PENDING', 'CONFIRMED', 'COMPLETED'].includes(order.status) ? '#fff' : 'var(--text-muted)' }}>Placed</span>
+                  </div>
+
+                  {/* Step 2: CONFIRMED (or processing) */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, gap: '0.5rem' }}>
+                    <div style={{ 
+                      width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: ['CONFIRMED', 'COMPLETED'].includes(order.status) ? '#3b82f6' : (['REJECTED', 'CANCELLED'].includes(order.status) ? '#ef4444' : 'var(--glass-bg)'),
+                      border: '2px solid', borderColor: ['CONFIRMED', 'COMPLETED'].includes(order.status) ? '#3b82f6' : (['REJECTED', 'CANCELLED'].includes(order.status) ? '#ef4444' : 'var(--glass-border)'),
+                      color: ['CONFIRMED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(order.status) ? '#fff' : 'var(--text-muted)'
+                    }}>
+                      {['REJECTED', 'CANCELLED'].includes(order.status) ? <XCircle size={16} /> : <Package size={16} />}
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: ['CONFIRMED', 'COMPLETED', 'REJECTED', 'CANCELLED'].includes(order.status) ? '#fff' : 'var(--text-muted)' }}>
+                      {['REJECTED', 'CANCELLED'].includes(order.status) ? 'Failed' : 'Processing'}
+                    </span>
+                  </div>
+
+                  {/* Step 3: COMPLETED */}
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 1, gap: '0.5rem' }}>
+                    <div style={{ 
+                      width: '32px', height: '32px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      background: order.status === 'COMPLETED' ? '#10b981' : 'var(--glass-bg)',
+                      border: '2px solid', borderColor: order.status === 'COMPLETED' ? '#10b981' : 'var(--glass-border)',
+                      color: order.status === 'COMPLETED' ? '#fff' : 'var(--text-muted)'
+                    }}>
+                      <CheckCircle size={16} />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', fontWeight: '500', color: order.status === 'COMPLETED' ? '#fff' : 'var(--text-muted)' }}>Completed</span>
+                  </div>
                 </div>
               </div>
               

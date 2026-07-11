@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { getProduct, addToCart } from '../services/api';
-import { ShoppingCart, ArrowLeft, ShieldCheck, Truck } from 'lucide-react';
+import { getProduct, addToCart, getInventory } from '../services/api';
+import { ShoppingCart, ArrowLeft, ShieldCheck, Truck, PackageX, PackageCheck } from 'lucide-react';
 import { useToast } from '../components/Toast';
 
 export default function ProductDetails({ refreshCart }) {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
+  const [stock, setStock] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const { addToast } = useToast();
@@ -15,10 +16,16 @@ export default function ProductDetails({ refreshCart }) {
     getProduct(id)
       .then(res => {
         setProduct(res.data);
+        // Fetch inventory if skuCode exists (or name, but usually skuCode is needed. We might need to generate skuCode or rely on backend. Let's see if product has skuCode)
+        const skuCode = res.data.skuCode || res.data.name.toLowerCase().replace(/ /g, '-');
+        return getInventory(skuCode).catch(() => ({ data: { isInStock: false, quantity: 0 } }));
+      })
+      .then(invRes => {
+        setStock(invRes?.data?.quantity || 0);
         setLoading(false);
       })
       .catch(err => {
-        console.error("Failed to load product", err);
+        console.error("Failed to load product/inventory", err);
         setLoading(false);
       });
   }, [id]);
@@ -63,21 +70,34 @@ export default function ProductDetails({ refreshCart }) {
             <p className="text-muted" style={{ lineHeight: '1.8' }}>{product.description}</p>
           </div>
 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1.5rem' }}>
+            {stock !== null && (
+              <div className={`px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2 ${stock > 0 ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                {stock > 0 ? <><PackageCheck size={16} /> In Stock ({stock} available)</> : <><PackageX size={16} /> Out of Stock</>}
+              </div>
+            )}
+          </div>
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '2rem' }}>
-            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', borderRadius: '10px' }}>
+            <div className="glass" style={{ display: 'flex', alignItems: 'center', padding: '0.5rem', borderRadius: '10px', opacity: stock === 0 ? 0.5 : 1, pointerEvents: stock === 0 ? 'none' : 'auto' }}>
               <button 
                 onClick={() => setQuantity(Math.max(1, quantity - 1))}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-light)', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.25rem' }}
               >-</button>
               <span style={{ padding: '0 1rem', fontWeight: '600' }}>{quantity}</span>
               <button 
-                onClick={() => setQuantity(quantity + 1)}
+                onClick={() => setQuantity(Math.min(stock, quantity + 1))}
                 style={{ background: 'transparent', border: 'none', color: 'var(--text-light)', padding: '0.5rem 1rem', cursor: 'pointer', fontSize: '1.25rem' }}
               >+</button>
             </div>
             
-            <button className="btn btn-primary" style={{ flex: 1, padding: '1rem' }} onClick={handleAddToCart}>
-              <ShoppingCart size={20} /> Add to Cart
+            <button 
+              className="btn btn-primary" 
+              style={{ flex: 1, padding: '1rem', opacity: stock === 0 ? 0.5 : 1, cursor: stock === 0 ? 'not-allowed' : 'pointer' }} 
+              onClick={handleAddToCart}
+              disabled={stock === 0}
+            >
+              <ShoppingCart size={20} /> {stock === 0 ? 'Unavailable' : 'Add to Cart'}
             </button>
           </div>
           

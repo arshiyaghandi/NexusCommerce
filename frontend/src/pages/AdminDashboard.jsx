@@ -14,8 +14,8 @@ export default function AdminDashboard() {
           fetchRevenue(),
           fetchTransactions()
         ]);
-        setSummary(revenueData);
-        setTransactions(txData);
+        setSummary(revenueData.data);
+        setTransactions(txData.data);
         setLoading(false);
       } catch (err) {
         console.error("Failed to load admin data", err);

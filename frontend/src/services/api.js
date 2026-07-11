@@ -86,15 +86,11 @@ export const placeOrder = () => api.post('/orders');
 export const getOrders = () => api.get('/orders');
 
 // Finance Endpoints (Admin Only)
-export const fetchRevenue = async () => {
-  const response = await api.get('http://localhost:8085/api/finance/revenue');
-  return response.data;
-};
+export const fetchRevenue = () => api.get('/finance/summary');
+export const fetchTransactions = () => api.get('/finance/transactions');
 
-export const fetchTransactions = async () => {
-  const response = await api.get('http://localhost:8085/api/finance/transactions');
-  return response.data;
-};
+// Inventory Endpoint
+export const getInventory = (skuCode) => api.get(`/inventory/${skuCode}`);
 
 // NEW: Register function
 export const register = async (username, password) => {
