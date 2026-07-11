@@ -5,6 +5,7 @@ import Home from './pages/Home';
 import Products from './pages/Products';
 import ProductDetails from './pages/ProductDetails';
 import Cart from './pages/Cart';
+import Checkout from './pages/Checkout';
 import Orders from './pages/Orders';
 import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
@@ -12,6 +13,7 @@ import Register from './pages/Register';
 import { checkAuth, getCart } from './services/api';
 import { ToastProvider } from './components/Toast';
 import NotificationManager from './components/NotificationManager';
+
 
 function App() {
   const [user, setUser] = useState(null);
@@ -45,6 +47,7 @@ function App() {
             <Route path="products" element={<Products refreshCart={refreshCart} />} />
             <Route path="products/:id" element={<ProductDetails refreshCart={refreshCart} />} />
             <Route path="cart" element={<Cart refreshCart={refreshCart} />} />
+            <Route path="checkout" element={<Checkout />} />
             <Route path="orders" element={<Orders />} />
             {user && user.roles && user.roles.includes('ROLE_ADMIN') && (
               <Route path="admin" element={<AdminDashboard />} />

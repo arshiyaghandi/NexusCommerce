@@ -37,18 +37,8 @@ export default function Cart({ refreshCart }) {
     loadCart();
   };
 
-  const handleCheckout = async () => {
-    setProcessing(true);
-    try {
-      await placeOrder();
-      refreshCart();
-      navigate('/orders');
-    } catch (e) {
-      console.error("Checkout failed", e);
-      alert("Failed to place order. " + (e.response?.data?.message || e.message));
-    } finally {
-      setProcessing(false);
-    }
+  const handleCheckout = () => {
+    navigate('/checkout');
   };
 
   if (loading) return <div className="text-center mt-4 text-muted">Loading cart...</div>;
