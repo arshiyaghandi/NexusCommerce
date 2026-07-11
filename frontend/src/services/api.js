@@ -92,12 +92,17 @@ export const fetchTransactions = () => api.get('/finance/transactions');
 // Inventory Endpoint
 export const getInventory = (skuCode) => api.get(`/inventory/${skuCode}`);
 
-// NEW: Register function
-export const register = async (username, password) => {
+// Register function - calls auth-service directly (not through gateway since user is not authenticated)
+export const register = async (username, password, email, firstName, lastName) => {
   try {
-    const response = await api.post('http://localhost:8084/api/auth/register', {
+    const response = await axios.post('http://localhost:8091/api/auth/register', {
       username,
-      password
+      password,
+      email,
+      firstName,
+      lastName
+    }, {
+      headers: { 'Content-Type': 'application/json' }
     });
     return response.data;
   } catch (error) {
