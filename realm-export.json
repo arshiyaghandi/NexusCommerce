@@ -1,0 +1,79 @@
+{
+  "id": "nexus-realm",
+  "realm": "nexus-realm",
+  "displayName": "NexusCommerce",
+  "enabled": true,
+  "users": [
+    {
+      "username": "admin",
+      "enabled": true,
+      "firstName": "Nexus",
+      "lastName": "Admin",
+      "email": "admin@nexus.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "admin",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["admin", "user"]
+    },
+    {
+      "username": "customer",
+      "enabled": true,
+      "firstName": "John",
+      "lastName": "Doe",
+      "email": "customer@nexus.com",
+      "emailVerified": true,
+      "credentials": [
+        {
+          "type": "password",
+          "value": "customer",
+          "temporary": false
+        }
+      ],
+      "realmRoles": ["user"]
+    }
+  ],
+  "roles": {
+    "realm": [
+      {
+        "name": "admin",
+        "description": "Administrator"
+      },
+      {
+        "name": "user",
+        "description": "Standard User"
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "nexus-auth-client",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "ICdEmE4XwvcC1HMLydpsuYwUh9pp0eHm",
+      "redirectUris": [
+        "http://localhost:8091/login/oauth2/code/keycloak"
+      ],
+      "webOrigins": [
+        "*"
+      ],
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "email"
+      ]
+    }
+  ]
+}

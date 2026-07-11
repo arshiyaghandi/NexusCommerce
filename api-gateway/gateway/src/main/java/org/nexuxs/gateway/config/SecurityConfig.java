@@ -28,7 +28,9 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
+                .cors(org.springframework.security.config.Customizer.withDefaults())
                 .authorizeExchange(exchanges -> exchanges
+                        .pathMatchers(org.springframework.http.HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/actuator/**", "/ws/**").permitAll()
                         .pathMatchers("/api/products/**").permitAll()
                         .pathMatchers("/api/finance/**").hasRole("ADMIN")

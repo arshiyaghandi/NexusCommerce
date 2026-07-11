@@ -50,4 +50,46 @@ public class AuthController {
                 "roles", oidcUser.getAuthorities()
         ));
     }
+
+    @org.springframework.web.bind.annotation.PostMapping("/register")
+    public Mono<org.springframework.http.ResponseEntity<Object>> register(@org.springframework.web.bind.annotation.RequestBody RegisterRequest request) {
+        return Mono.fromCallable(() -> {
+            try (org.keycloak.admin.client.Keycloak keycloak = org.keycloak.admin.client.KeycloakBuilder.builder()
+                    .serverUrl("http://localhost:8081")
+                    .realm("master")
+                    .clientId("admin-cli")
+                    .username("admin")
+                    .password("admin")
+                    .build()) {
+                
+                org.keycloak.representations.idm.UserRepresentation user = new org.keycloak.representations.idm.UserRepresentation();
+                user.setUsername(request.getUsername());
+                user.setEnabled(true);
+                
+                org.keycloak.representations.idm.CredentialRepresentation cred = new org.keycloak.representations.idm.CredentialRepresentation();
+                cred.setType(org.keycloak.representations.idm.CredentialRepresentation.PASSWORD);
+                cred.setValue(request.getPassword());
+                cred.setTemporary(false);
+                user.setCredentials(java.util.Collections.singletonList(cred));
+                
+                jakarta.ws.rs.core.Response response = keycloak.realm("nexus-realm").users().create(user);
+                
+                if (response.getStatus() == 201) {
+                    // Get the created user ID
+                    String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
+                    
+                    // Assign 'user' role
+                    org.keycloak.representations.idm.RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
+                    keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(java.util.Collections.singletonList(userRole));
+                    
+                    return org.springframework.http.ResponseEntity.status(HttpStatus.CREATED).body((Object) Map.of("message", "User created successfully"));
+                } else {
+                    return org.springframework.http.ResponseEntity.status(response.getStatus()).body((Object) Map.of("error", "Failed to create user. Status: " + response.getStatus()));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+                return org.springframework.http.ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) Map.of("error", e.getMessage()));
+            }
+        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+    }
 }
