@@ -1,15 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getCart, placeOrder } from '../services/api';
-import { useNotification } from '../components/NotificationManager';
+import { useToast } from '../components/Toast';
+import { CreditCard, MapPin, Loader2, ShoppingBag } from 'lucide-react';
 
-const Checkout = () => {
+export default function Checkout() {
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [address, setAddress] = useState({ fullName: '', street: '', city: '', zip: '' });
   const navigate = useNavigate();
-  const { addNotification } = useNotification();
+  const { addToast } = useToast();
 
   useEffect(() => {
     fetchCart();
@@ -18,9 +19,9 @@ const Checkout = () => {
   const fetchCart = async () => {
     try {
       const response = await getCart();
-      setCartItems(response.data.items || []);
+      setCartItems(response.data || []);
     } catch (err) {
-      addNotification('Failed to load cart', 'error');
+      addToast('Failed to load cart', 'error');
     } finally {
       setLoading(false);
     }
@@ -33,125 +34,175 @@ const Checkout = () => {
   const handlePlaceOrder = async (e) => {
     e.preventDefault();
     if (cartItems.length === 0) {
-      addNotification('Cart is empty', 'error');
+      addToast('Cart is empty', 'error');
       return;
     }
-    
+
     setPlacingOrder(true);
     try {
       await placeOrder();
-      addNotification('Order placed successfully! Processing...', 'success');
+      addToast('Order placed! Processing payment via Saga...', 'success');
       navigate('/orders');
     } catch (err) {
-      addNotification('Failed to place order. Please try again.', 'error');
+      addToast('Failed to place order. Please try again.', 'error');
     } finally {
       setPlacingOrder(false);
     }
   };
 
-  if (loading) return <div className="text-center p-8 text-white">Loading checkout...</div>;
+  if (loading) return (
+    <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--text-muted)' }}>
+      <Loader2 size={32} className="spin" style={{ margin: '0 auto 1rem' }} />
+      <p>Loading checkout...</p>
+    </div>
+  );
 
   const total = cartItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8 animate-fade-in">
-      <h1 className="text-3xl font-bold text-white mb-6">Checkout</h1>
-      
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+    <div className="animate-fade-in-up">
+      <h2 style={{ marginBottom: '2rem', fontSize: '2rem' }}>Checkout</h2>
+
+      <div className="grid grid-cols-2">
         {/* Order Summary */}
-        <div className="glass-card p-6 border border-white/10 rounded-2xl relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <h2 className="text-xl font-semibold text-white mb-4">Order Summary</h2>
+        <div className="glass" style={{ padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <ShoppingBag size={22} color="var(--accent-primary)" />
+            Order Summary
+          </h3>
+
           {cartItems.length === 0 ? (
-            <p className="text-gray-400">Your cart is empty.</p>
+            <p className="text-muted">Your cart is empty.</p>
           ) : (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
               {cartItems.map((item) => (
-                <div key={item.productId} className="flex justify-between items-center text-sm border-b border-white/10 pb-2">
-                  <span className="text-gray-300">{item.productName} x {item.quantity}</span>
-                  <span className="text-white font-medium">${(item.unitPrice * item.quantity).toFixed(2)}</span>
+                <div key={item.productId} className="flex-between" style={{ borderBottom: '1px solid var(--glass-border)', paddingBottom: '0.75rem' }}>
+                  <span className="text-muted">{item.productName} × {item.quantity}</span>
+                  <span style={{ fontWeight: '600' }}>${(item.unitPrice * item.quantity).toFixed(2)}</span>
                 </div>
               ))}
-              <div className="flex justify-between items-center pt-4 text-lg font-bold">
-                <span className="text-white">Total</span>
-                <span className="text-primary">${total.toFixed(2)}</span>
+              <div className="flex-between" style={{ paddingTop: '0.75rem', fontSize: '1.25rem', fontWeight: '700' }}>
+                <span>Total</span>
+                <span style={{ color: 'var(--accent-primary)' }}>${total.toFixed(2)}</span>
               </div>
             </div>
           )}
         </div>
 
         {/* Shipping & Payment Form */}
-        <div className="glass-card p-6 border border-white/10 rounded-2xl relative overflow-hidden group">
-          <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-          <h2 className="text-xl font-semibold text-white mb-4">Shipping Information</h2>
-          <form onSubmit={handlePlaceOrder} className="space-y-4 relative z-10">
+        <div className="glass" style={{ padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <MapPin size={22} color="var(--accent-primary)" />
+            Shipping Information
+          </h3>
+
+          <form onSubmit={handlePlaceOrder} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Full Name</label>
-              <input 
-                type="text" 
+              <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '500' }}>Full Name</label>
+              <input
+                type="text"
                 name="fullName"
                 required
                 value={address.fullName}
                 onChange={handleInputChange}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                placeholder="John Doe"
+                style={{
+                  width: '100%', padding: '0.875rem 1rem',
+                  background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px', color: 'white', fontSize: '1rem',
+                  outline: 'none', boxSizing: 'border-box'
+                }}
               />
             </div>
+
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-1">Street Address</label>
-              <input 
-                type="text" 
+              <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '500' }}>Street Address</label>
+              <input
+                type="text"
                 name="street"
                 required
                 value={address.street}
                 onChange={handleInputChange}
-                className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                placeholder="123 Main St"
+                style={{
+                  width: '100%', padding: '0.875rem 1rem',
+                  background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '12px', color: 'white', fontSize: '1rem',
+                  outline: 'none', boxSizing: 'border-box'
+                }}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">City</label>
-                <input 
-                  type="text" 
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '500' }}>City</label>
+                <input
+                  type="text"
                   name="city"
                   required
                   value={address.city}
                   onChange={handleInputChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                  placeholder="Tehran"
+                  style={{
+                    width: '100%', padding: '0.875rem 1rem',
+                    background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px', color: 'white', fontSize: '1rem',
+                    outline: 'none', boxSizing: 'border-box'
+                  }}
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-1">ZIP Code</label>
-                <input 
-                  type="text" 
+                <label style={{ display: 'block', marginBottom: '0.4rem', color: 'var(--text-muted)', fontSize: '0.875rem', fontWeight: '500' }}>ZIP Code</label>
+                <input
+                  type="text"
                   name="zip"
                   required
                   value={address.zip}
                   onChange={handleInputChange}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg py-2 px-4 text-white focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all duration-300" 
+                  placeholder="12345"
+                  style={{
+                    width: '100%', padding: '0.875rem 1rem',
+                    background: 'rgba(0,0,0,0.2)', border: '1px solid rgba(255,255,255,0.1)',
+                    borderRadius: '12px', color: 'white', fontSize: '1rem',
+                    outline: 'none', boxSizing: 'border-box'
+                  }}
                 />
               </div>
             </div>
-            
-            <div className="pt-4">
-              <div className="p-3 bg-primary/10 border border-primary/30 rounded-lg mb-4">
-                <p className="text-sm text-primary flex items-center">
-                  <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                  Payment is handled automatically via our secure Nexus Saga.
-                </p>
-              </div>
-              <button 
-                type="submit" 
-                disabled={placingOrder || cartItems.length === 0}
-                className="w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 px-6 rounded-lg shadow-[0_0_15px_rgba(139,92,246,0.5)] transition-all duration-300 hover:shadow-[0_0_25px_rgba(139,92,246,0.7)] hover:-translate-y-1 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {placingOrder ? 'Processing...' : `Pay $${total.toFixed(2)}`}
-              </button>
+
+            {/* Payment info notice */}
+            <div style={{
+              padding: '1rem 1.25rem',
+              background: 'rgba(108, 92, 231, 0.1)',
+              border: '1px solid rgba(108, 92, 231, 0.3)',
+              borderRadius: '12px'
+            }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--accent-primary)' }}>
+                💳 Payment is processed automatically and securely via the NexusCommerce Saga pipeline.
+              </p>
             </div>
+
+            <button
+              type="submit"
+              disabled={placingOrder || cartItems.length === 0}
+              className="btn btn-primary"
+              style={{
+                width: '100%', padding: '1rem', fontSize: '1.05rem',
+                display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
+                opacity: (placingOrder || cartItems.length === 0) ? 0.6 : 1,
+                cursor: (placingOrder || cartItems.length === 0) ? 'not-allowed' : 'pointer',
+                boxShadow: '0 8px 32px rgba(108, 92, 231, 0.4)'
+              }}
+            >
+              {placingOrder ? (
+                <><Loader2 size={20} className="spin" /> Processing...</>
+              ) : (
+                <><CreditCard size={20} /> Pay ${total.toFixed(2)}</>
+              )}
+            </button>
           </form>
         </div>
       </div>
     </div>
   );
-};
-
-export default Checkout;
+}
