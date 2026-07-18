@@ -67,8 +67,11 @@ export const checkAuth = () => {
 };
 
 // Product Endpoints
-export const getProducts = () => api.get('/products');
+export const getProducts = (search = '') => api.get(`/products${search ? `?search=${encodeURIComponent(search)}` : ''}`);
 export const getProduct = (id) => api.get(`/products/${id}`);
+export const createProduct = (productData) => api.post('/products', productData);
+export const updateProduct = (id, productData) => api.put(`/products/${id}`, productData);
+export const deleteProduct = (id) => api.delete(`/products/${id}`);
 
 // Cart Endpoints
 export const getCart = () => api.get('/cart');
