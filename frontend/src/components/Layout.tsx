@@ -129,14 +129,14 @@ export default function Layout() {
                   className="btn btn-outline"
                   style={{ gap: '0.4rem', padding: '0.5rem 1.1rem', fontSize: '0.9rem' }}
                 >
-                  <User size={16} /> Login
+                  Sign In
                 </Link>
                 <Link
                   to="/register"
                   className="btn btn-primary"
                   style={{ gap: '0.4rem', padding: '0.5rem 1.25rem', fontSize: '0.9rem' }}
                 >
-                  Sign Up
+                  Get Started
                 </Link>
               </div>
             )}
@@ -171,7 +171,11 @@ export default function Layout() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
               <Link to="/" className="text-muted" style={{ textDecoration: 'none' }}>Home</Link>
               <Link to="/products" className="text-muted" style={{ textDecoration: 'none' }}>Products</Link>
-              <Link to="/cart" className="text-muted" style={{ textDecoration: 'none' }}>Cart</Link>
+              {user ? (
+                <Link to="/cart" className="text-muted" style={{ textDecoration: 'none' }}>Cart</Link>
+              ) : (
+                <Link to="/register" className="text-muted" style={{ textDecoration: 'none' }}>Get Started</Link>
+              )}
             </div>
           </div>
           <div>

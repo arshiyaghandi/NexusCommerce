@@ -32,17 +32,22 @@ export default function App() {
           <NotificationManager />
           <BrowserRouter>
             <Routes>
-              <Route path="/" element={<Layout />}>
+              <Route element={<Layout />}>
+                {/* Public routes — no auth required */}
                 <Route index element={<Home />} />
-                <Route path="login" element={<Login />} />
-                <Route path="register" element={<Register />} />
                 <Route path="products" element={<Products />} />
                 <Route path="products/:id" element={<ProductDetails />} />
+                <Route path="login" element={<Login />} />
+                <Route path="register" element={<Register />} />
+
+                {/* Protected routes — auth required */}
                 <Route element={<ProtectedRoute />}>
                   <Route path="cart" element={<Cart />} />
                   <Route path="checkout" element={<Checkout />} />
                   <Route path="orders" element={<Orders />} />
                 </Route>
+
+                {/* Admin routes — admin role required */}
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminDashboard />} />
                 </Route>

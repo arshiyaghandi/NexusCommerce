@@ -1,5 +1,5 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, Zap, ShieldCheck, Truck, ShoppingCart } from 'lucide-react';
+import { ShoppingBag, Zap, ShieldCheck, Truck, ShoppingCart, ArrowRight } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
 import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
@@ -75,9 +75,15 @@ export default function Home() {
             find exactly what you need at NexusCommerce.
           </p>
           <div style={{ display: 'flex', gap: '1rem' }}>
-            <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
-              <ShoppingBag size={20} /> Shop Now
-            </Link>
+            {user ? (
+              <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
+                <ShoppingBag size={20} /> Shop Now
+              </Link>
+            ) : (
+              <Link to="/register" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
+                Get Started Free <ArrowRight size={20} />
+              </Link>
+            )}
             <Link to="/products" className="btn btn-outline" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem', background: 'rgba(255,255,255,0.05)' }}>
               Explore Categories
             </Link>
@@ -167,11 +173,24 @@ export default function Home() {
       >
         <h2>Ready to start shopping?</h2>
         <p className="text-muted" style={{ fontSize: '1.2rem', margin: '1rem auto 2rem', maxWidth: '600px' }}>
-          Join thousands of satisfied customers who have made NexusCommerce their primary destination for premium goods.
+          {user
+            ? 'Browse our full catalog and find your next favorite product.'
+            : 'Join thousands of satisfied customers. Create your free account and start shopping today.'}
         </p>
-        <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 3rem' }}>
-          Browse Catalog
-        </Link>
+        {user ? (
+          <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 3rem' }}>
+            Browse Catalog
+          </Link>
+        ) : (
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center' }}>
+            <Link to="/register" className="btn btn-primary" style={{ padding: '1rem 3rem' }}>
+              Create Free Account <ArrowRight size={18} />
+            </Link>
+            <Link to="/login" className="btn btn-outline" style={{ padding: '1rem 2.5rem' }}>
+              Sign In
+            </Link>
+          </div>
+        )}
       </section>
     </div>
   );
