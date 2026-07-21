@@ -1,18 +1,13 @@
 package org.nexuxs.product.api;
 
 import lombok.RequiredArgsConstructor;
+import org.nexuxs.product.data.dto.ProductRequest;
 import org.nexuxs.product.data.dto.ProductResponse;
 import org.nexuxs.product.service.ProductService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
-import reactor.core.publisher.Flux;
-import reactor.core.publisher.Mono;
-
-import org.nexuxs.product.data.dto.ProductRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @RestController
 @RequestMapping("/api/products")

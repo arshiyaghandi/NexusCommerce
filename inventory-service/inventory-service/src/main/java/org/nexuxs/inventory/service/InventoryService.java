@@ -10,6 +10,7 @@ import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.messaging.contracts.event.InventoryReservedEvent;
 import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
 import org.nexuxs.messaging.contracts.event.OrderLineRecord;
+import org.nexuxs.messaging.contracts.event.ReservedLineRecord;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
@@ -24,6 +25,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -54,13 +56,18 @@ public class InventoryService {
                 .flatMap(reservedLines -> {
                     InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
                     if (publisher == null) return Mono.empty();
+
+                    List<ReservedLineRecord> items = reservedLines.stream()
+                            .map(rl -> new ReservedLineRecord(null, rl.skuCode(), rl.quantity(), rl.remainingQuantity()))
+                            .toList();
+
                     return publisher.publishReservedEvent(new InventoryReservedEvent(
                             event.orderId(),
                             event.userId(),
                             reservedLines.get(0).skuCode(),
-                            reservedLines.get(0).quantity(),
+                            reservedLines.stream().mapToInt(ReservedLine::quantity).sum(),
                             reservedLines.get(0).remainingQuantity(),
-                            java.util.List.of(), // items list not populated in single-SKU flow
+                            items,
                             event.totalPrice(),
                             Instant.now()
                     ));

@@ -1,47 +1,8 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { UserPlus, ArrowRight, Lock, User, Mail, UserCircle, Loader2, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
-import { register } from '../services/api';
-import { useToast } from '../components/Toast';
-
-const PasswordStrength = ({ password }) => {
-  const checks = [
-    { label: 'At least 8 characters', pass: password.length >= 8 },
-    { label: 'Contains uppercase', pass: /[A-Z]/.test(password) },
-    { label: 'Contains lowercase', pass: /[a-z]/.test(password) },
-    { label: 'Contains number', pass: /\d/.test(password) },
-  ];
-  const strength = checks.filter(c => c.pass).length;
-  const colors = ['#ef4444', '#f59e0b', '#eab308', '#10b981'];
-  const labels = ['Weak', 'Fair', 'Good', 'Strong'];
-
-  if (!password) return null;
-
-  return (
-    <div style={{ marginTop: '0.75rem' }}>
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
-        {[0, 1, 2, 3].map(i => (
-          <div key={i} style={{
-            flex: 1, height: '4px', borderRadius: '2px',
-            background: i < strength ? colors[strength - 1] : 'rgba(255,255,255,0.1)',
-            transition: 'background 0.3s'
-          }} />
-        ))}
-      </div>
-      <span style={{ fontSize: '0.75rem', color: strength > 0 ? colors[strength - 1] : 'var(--text-muted)' }}>
-        {strength > 0 ? labels[strength - 1] : ''}
-      </span>
-      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
-        {checks.map((check, idx) => (
-          <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.75rem', color: check.pass ? '#10b981' : 'rgba(255,255,255,0.3)' }}>
-            {check.pass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
-            {check.label}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+import { Link, useNavigate } from 'react-router-dom';
+import { UserPlus, ArrowRight, Lock, User, Mail, UserCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
+import { register } from '../api/auth';
+import { useToast } from '../contexts/ToastContext';
 
 const inputStyle = {
   width: '100%',
@@ -53,16 +14,87 @@ const inputStyle = {
   fontSize: '1rem',
   outline: 'none',
   transition: 'border-color 0.3s, box-shadow 0.3s',
-  boxSizing: 'border-box'
+  boxSizing: 'border-box' as const,
 };
 
 const iconStyle = {
-  position: 'absolute', top: '50%', left: '1rem', transform: 'translateY(-50%)', color: 'rgba(255,255,255,0.4)'
+  position: 'absolute' as const,
+  top: '50%',
+  left: '1rem',
+  transform: 'translateY(-50%)',
+  color: 'rgba(255,255,255,0.4)',
 };
 
+interface FormFields {
+  username: string;
+  password: string;
+  confirmPassword: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+}
+
+function PasswordStrength({ password }: { password: string }) {
+  const checks = [
+    { label: 'At least 8 characters', pass: password.length >= 8 },
+    { label: 'Contains uppercase', pass: /[A-Z]/.test(password) },
+    { label: 'Contains lowercase', pass: /[a-z]/.test(password) },
+    { label: 'Contains number', pass: /\d/.test(password) },
+  ];
+  const strength = checks.filter((c) => c.pass).length;
+  const colors = ['#ef4444', '#f59e0b', '#eab308', '#10b981'];
+  const labels = ['Weak', 'Fair', 'Good', 'Strong'];
+
+  if (!password) return null;
+
+  return (
+    <div style={{ marginTop: '0.75rem' }}>
+      <div style={{ display: 'flex', gap: '4px', marginBottom: '0.5rem' }}>
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            style={{
+              flex: 1,
+              height: '4px',
+              borderRadius: '2px',
+              background: i < strength ? colors[strength - 1]! : 'rgba(255,255,255,0.1)',
+              transition: 'background 0.3s',
+            }}
+          />
+        ))}
+      </div>
+      <span style={{ fontSize: '0.75rem', color: strength > 0 ? colors[strength - 1] : 'var(--text-muted)' }}>
+        {strength > 0 ? labels[strength - 1] : ''}
+      </span>
+      <div style={{ marginTop: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+        {checks.map((check, idx) => (
+          <div
+            key={idx}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              fontSize: '0.75rem',
+              color: check.pass ? '#10b981' : 'rgba(255,255,255,0.3)',
+            }}
+          >
+            {check.pass ? <CheckCircle2 size={12} /> : <XCircle size={12} />}
+            {check.label}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function Register() {
-  const [formData, setFormData] = useState({
-    username: '', password: '', confirmPassword: '', email: '', firstName: '', lastName: ''
+  const [formData, setFormData] = useState<FormFields>({
+    username: '',
+    password: '',
+    confirmPassword: '',
+    email: '',
+    firstName: '',
+    lastName: '',
   });
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -70,33 +102,39 @@ export default function Register() {
   const navigate = useNavigate();
   const { addToast } = useToast();
 
-  const handleChange = (field) => (e) => {
-    setFormData(prev => ({ ...prev, [field]: e.target.value }));
+  const handleChange = (field: keyof FormFields) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const handleRegister = async (e) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (formData.password !== formData.confirmPassword) {
-      addToast("Passwords do not match", "error");
+      addToast('Passwords do not match', 'error');
       return;
     }
     if (formData.password.length < 8) {
-      addToast("Password must be at least 8 characters", "error");
+      addToast('Password must be at least 8 characters', 'error');
       return;
     }
     if (!formData.username.trim()) {
-      addToast("Username is required", "error");
+      addToast('Username is required', 'error');
       return;
     }
 
     setIsLoading(true);
     try {
-      await register(formData.username, formData.password, formData.email, formData.firstName, formData.lastName);
-      addToast("Registration successful! Redirecting to login...", "success");
+      await register({
+        username: formData.username,
+        password: formData.password,
+        email: formData.email || undefined,
+        firstName: formData.firstName || undefined,
+        lastName: formData.lastName || undefined,
+      });
+      addToast('Registration successful! Redirecting to login...', 'success');
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
-      addToast(err.message || 'Registration failed. Please try again.', 'error');
+      addToast(err instanceof Error ? err.message : 'Registration failed', 'error');
     } finally {
       setIsLoading(false);
     }
@@ -105,17 +143,19 @@ export default function Register() {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 'calc(100vh - 300px)', padding: '2rem' }}>
       <div className="glass animate-fade-in-up" style={{ padding: '2.5rem', borderRadius: '24px', width: '100%', maxWidth: '500px' }}>
-        
-        {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: '2rem' }}>
-          <img src="/logo.jpg" alt="NexusCommerce Logo" style={{ width: '70px', height: '70px', borderRadius: '50%', marginBottom: '0.75rem', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }} />
-          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.5rem', background: 'linear-gradient(45deg, #fff, rgba(255,255,255,0.7))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>Create Account</h2>
+          <img
+            src="/logo.jpg"
+            alt="NexusCommerce"
+            style={{ width: '70px', height: '70px', borderRadius: '50%', marginBottom: '0.75rem', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }}
+          />
+          <h2 style={{ fontSize: '1.75rem', marginBottom: '0.5rem', background: 'linear-gradient(45deg, #fff, rgba(255,255,255,0.7))', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
+            Create Account
+          </h2>
           <p className="text-muted" style={{ fontSize: '0.9rem' }}>Join NexusCommerce for exclusive premium tech</p>
         </div>
 
-        <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-          
-          {/* Name Row */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
             <div>
               <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.85rem' }}>First Name</label>
@@ -133,7 +173,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Email */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.85rem' }}>Email</label>
             <div style={{ position: 'relative' }}>
@@ -142,7 +181,6 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Username */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               Username <span style={{ color: '#ef4444' }}>*</span>
@@ -153,23 +191,22 @@ export default function Register() {
             </div>
           </div>
 
-          {/* Password */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               Password <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <div style={iconStyle}><Lock size={18} /></div>
-              <input 
-                type={showPassword ? 'text' : 'password'} 
-                value={formData.password} 
-                onChange={handleChange('password')} 
-                required 
-                style={inputStyle} 
-                placeholder="Create a password" 
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={handleChange('password')}
+                required
+                style={inputStyle}
+                placeholder="Create a password"
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 style={{ position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0 }}
               >
@@ -179,30 +216,30 @@ export default function Register() {
             <PasswordStrength password={formData.password} />
           </div>
 
-          {/* Confirm Password */}
           <div>
             <label style={{ display: 'block', marginBottom: '0.4rem', fontWeight: '500', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
               Confirm Password <span style={{ color: '#ef4444' }}>*</span>
             </label>
             <div style={{ position: 'relative' }}>
               <div style={iconStyle}><Lock size={18} /></div>
-              <input 
-                type={showConfirm ? 'text' : 'password'} 
-                value={formData.confirmPassword} 
-                onChange={handleChange('confirmPassword')} 
-                required 
+              <input
+                type={showConfirm ? 'text' : 'password'}
+                value={formData.confirmPassword}
+                onChange={handleChange('confirmPassword')}
+                required
                 style={{
                   ...inputStyle,
-                  borderColor: formData.confirmPassword && formData.confirmPassword !== formData.password 
-                    ? 'rgba(239, 68, 68, 0.5)' 
-                    : formData.confirmPassword && formData.confirmPassword === formData.password
-                      ? 'rgba(16, 185, 129, 0.5)'
-                      : 'rgba(255,255,255,0.1)'
-                }} 
-                placeholder="Confirm your password" 
+                  borderColor:
+                    formData.confirmPassword && formData.confirmPassword !== formData.password
+                      ? 'rgba(239, 68, 68, 0.5)'
+                      : formData.confirmPassword && formData.confirmPassword === formData.password
+                        ? 'rgba(16, 185, 129, 0.5)'
+                        : 'rgba(255,255,255,0.1)',
+                }}
+                placeholder="Confirm your password"
               />
-              <button 
-                type="button" 
+              <button
+                type="button"
                 onClick={() => setShowConfirm(!showConfirm)}
                 style={{ position: 'absolute', top: '50%', right: '1rem', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(255,255,255,0.4)', cursor: 'pointer', padding: 0 }}
               >
@@ -221,19 +258,26 @@ export default function Register() {
             )}
           </div>
 
-          {/* Submit */}
-          <button 
-            type="submit" 
-            className="btn btn-primary" 
-            style={{ 
-              width: '100%', padding: '1rem', fontSize: '1.05rem',
-              display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '0.5rem',
-              marginTop: '0.5rem', boxShadow: '0 8px 32px rgba(108, 92, 231, 0.4)',
-              opacity: isLoading ? 0.7 : 1
+          <button
+            type="submit"
+            className="btn btn-primary"
+            style={{
+              width: '100%',
+              padding: '1rem',
+              fontSize: '1.05rem',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              gap: '0.5rem',
+              marginTop: '0.5rem',
+              boxShadow: '0 8px 32px rgba(108, 92, 231, 0.4)',
+              opacity: isLoading ? 0.7 : 1,
             }}
             disabled={isLoading}
           >
-            {isLoading ? <Loader2 className="spin" size={20} /> : (
+            {isLoading ? (
+              <span className="spin" style={{ display: 'inline-flex' }}><ArrowRight size={20} /></span>
+            ) : (
               <>
                 <UserPlus size={20} /> Create Account <ArrowRight size={18} />
               </>
@@ -241,8 +285,13 @@ export default function Register() {
           </button>
         </form>
 
-        <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
-          Already have an account? <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: '600' }}>Log In</Link>
+        <div style={{ textAlign: 'center', marginTop: '2rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.05)', fontSize: '0.9rem' }}>
+          <span className="text-muted">
+            Already have an account?{' '}
+            <Link to="/login" style={{ color: 'var(--accent-primary)', textDecoration: 'none', fontWeight: '600' }}>
+              Log In
+            </Link>
+          </span>
         </div>
       </div>
     </div>

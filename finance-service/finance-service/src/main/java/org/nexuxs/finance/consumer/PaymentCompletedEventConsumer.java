@@ -19,7 +19,8 @@ public class PaymentCompletedEventConsumer {
 
     @KafkaListener(
             topics = NexusTopics.PAYMENT_COMPLETED,
-            groupId = "finance-service"
+            groupId = "finance-service",
+            containerFactory = "paymentCompletedListenerFactory"
     )
     public void consume(PaymentCompletedEvent event) {
         log.info("[finance] payment.completed | paymentId={} orderId={} user={} amount={}",

@@ -60,6 +60,10 @@ spring:
           uri: lb://notification-service
           predicates:
             - Path=/ws/**
+        - id: auth-service
+          uri: lb://auth-service
+          predicates:
+            - Path=/api/auth/**
   security:
     oauth2:
       resourceserver:

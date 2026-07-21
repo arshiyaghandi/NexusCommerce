@@ -25,3 +25,5 @@ eureka:
   server:
     enable-self-preservation: false
     eviction-interval-timer-in-ms: 5000
+    wait-time-in-ms-when-sync-empty: 0
+    peer-eureka-nodes-update-interval-ms: 60000

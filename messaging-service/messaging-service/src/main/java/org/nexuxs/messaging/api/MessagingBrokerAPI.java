@@ -18,7 +18,10 @@ public class MessagingBrokerAPI {
                 "broker", "kafka",
                 "topics", List.of(
                         NexusTopics.ORDER_CREATED,
-                        NexusTopics.INVENTORY_RESERVED
+                        NexusTopics.INVENTORY_RESERVED,
+                        NexusTopics.INVENTORY_FAILED,
+                        NexusTopics.PAYMENT_COMPLETED,
+                        NexusTopics.PAYMENT_FAILED
                 )
         );
     }

@@ -1,0 +1,4 @@
+try { $r = Invoke-WebRequest -Uri "http://localhost:8761/" -TimeoutSec 3 -UseBasicParsing; Write-Host "discovery (8761): $($r.StatusCode)" } catch { Write-Host "discovery (8761): $($_.Exception.Message)" }
+try { $r = Invoke-WebRequest -Uri "http://localhost:8080/" -TimeoutSec 3 -UseBasicParsing; Write-Host "gateway (8080): $($r.StatusCode)" } catch { Write-Host "gateway (8080): $($_.Exception.Message)" }
+try { $r = Invoke-WebRequest -Uri "http://localhost:8083/" -TimeoutSec 3 -UseBasicParsing; Write-Host "inventory (8083): $($r.StatusCode)" } catch { Write-Host "inventory (8083): $($_.Exception.Message)" }
+try { $r = Invoke-WebRequest -Uri "http://localhost:8086/" -TimeoutSec 3 -UseBasicParsing; Write-Host "cart (8086): $($r.StatusCode)" } catch { Write-Host "cart (8086): $($_.Exception.Message)" }
