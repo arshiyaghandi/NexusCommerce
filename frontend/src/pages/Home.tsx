@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
   const { data: products, isLoading } = useProducts();
-  const { addItem } = useCart();
+  const { addItem } = useCart(!!user);
   const { addToast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();

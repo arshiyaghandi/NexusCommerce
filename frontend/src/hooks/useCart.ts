@@ -11,12 +11,13 @@ export function useCartCount(enabled = true) {
   });
 }
 
-export function useCart() {
+export function useCart(enabled = true) {
   const queryClient = useQueryClient();
 
   const cartQuery = useQuery({
     queryKey: ['cart'],
     queryFn: getCart,
+    enabled,
   });
 
   const addMutation = useMutation({
