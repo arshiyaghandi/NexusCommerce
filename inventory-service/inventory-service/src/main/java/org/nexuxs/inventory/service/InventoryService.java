@@ -45,10 +45,10 @@ public class InventoryService {
 
     /**
      * Saga execution: for each order line, attempt to reserve stock.
-     * If any line fails, publishes InventoryFailedEvent immediately.
      * If all succeed, publishes InventoryReservedEvent.
+     * If any line fails, publishes InventoryFailedEvent so the order-service
+     * can reject the order (the Saga compensation path).
      */
-    @Transactional
     public Mono<Void> handleOrderCreated(OrderCreatedEvent event) {
         return Flux.fromIterable(event.items())
                 .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line))
@@ -71,11 +71,28 @@ public class InventoryService {
                             event.totalPrice(),
                             Instant.now()
                     ));
+                })
+                .onErrorResume(error -> {
+                    String reason = error.getMessage() != null ? error.getMessage() : "RESERVATION_FAILED";
+                    String skuCode = event.items().isEmpty() ? "UNKNOWN" : toSkuCode(event.items().get(0).productId());
+                    log.error("Reservation failed for orderId={}, publishing InventoryFailedEvent: {}",
+                            event.orderId(), reason);
+
+                    InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
+                    if (publisher == null) return Mono.empty();
+
+                    return publisher.publishFailedEvent(new InventoryFailedEvent(
+                            event.orderId(),
+                            skuCode,
+                            reason,
+                            Instant.now()
+                    ));
                 });
     }
 
     /**
-     * Reserves stock for a single order line. Returns a record with reservation details
+     * Reserves stock for a single order line using an atomic UPDATE to prevent
+     * the TOCTOU race condition. Returns a record with reservation details
      * on success, or errors with insufficient stock.
      */
     private Mono<ReservedLine> reserveLine(Long orderId, String userId, BigDecimal totalPrice, OrderLineRecord line) {
@@ -84,21 +101,13 @@ public class InventoryService {
 
         log.info("Processing reservation for Order: {}, SKU: {}, Quantity: {}", orderId, skuCode, requestedQuantity);
 
-        return inventoryRepository.findBySkuCode(skuCode)
-                .flatMap(item -> {
-                    if (item.getQuantity() >= requestedQuantity) {
-                        item.setQuantity(item.getQuantity() - requestedQuantity);
-                        return inventoryRepository.save(item)
-                                .map(saved -> new ReservedLine(skuCode, requestedQuantity, saved.getQuantity()));
-                    } else {
-                        log.warn("Insufficient stock for Order: {}. Requested: {}, Available: {}", orderId, requestedQuantity, item.getQuantity());
-                        return Mono.error(new IllegalStateException("INSUFFICIENT_STOCK"));
-                    }
-                })
+        return inventoryRepository.decrementStock(skuCode, requestedQuantity)
                 .switchIfEmpty(Mono.defer(() -> {
-                    log.error("SKU {} not found for Order {}", skuCode, orderId);
-                    return Mono.error(new IllegalStateException("SKU_NOT_FOUND"));
-                }));
+                    log.warn("Insufficient stock or SKU not found for Order: {}. SKU: {}, Requested: {}",
+                            orderId, skuCode, requestedQuantity);
+                    return Mono.error(new IllegalStateException("INSUFFICIENT_STOCK"));
+                }))
+                .map(saved -> new ReservedLine(skuCode, requestedQuantity, saved.getQuantity()));
     }
 
     public Mono<Void> releaseStock(Long productId, int quantity) {

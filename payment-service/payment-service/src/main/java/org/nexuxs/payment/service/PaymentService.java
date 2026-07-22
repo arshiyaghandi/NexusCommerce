@@ -78,12 +78,15 @@ public class PaymentService {
         PaymentEventPublisher publisher = publisherProvider.getIfAvailable();
         if (publisher == null) return Mono.empty();
 
-        Long productId = Long.parseLong(event.skuCode().replace("SKU", ""));
-        List<OrderLineRecord> items = List.of(new OrderLineRecord(productId, event.quantity(), null));
+        List<OrderLineRecord> items = event.items() != null
+                ? event.items().stream()
+                    .map(rl -> new OrderLineRecord(rl.productId(), rl.quantity(), null))
+                    .toList()
+                : List.of();
 
         PaymentFailedEvent failedEvent = new PaymentFailedEvent(
                 event.orderId(),
-                productId,
+                items.isEmpty() ? null : items.get(0).productId(),
                 event.quantity(),
                 items,
                 reason,
