@@ -17,7 +17,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -25,6 +24,7 @@ import reactor.core.publisher.Mono;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -46,12 +46,15 @@ public class InventoryService {
     /**
      * Saga execution: for each order line, attempt to reserve stock.
      * If all succeed, publishes InventoryReservedEvent.
-     * If any line fails, publishes InventoryFailedEvent so the order-service
-     * can reject the order (the Saga compensation path).
+     * If any line fails, releases all previously reserved stock for this order
+     * and publishes InventoryFailedEvent so the order-service can reject the order.
      */
     public Mono<Void> handleOrderCreated(OrderCreatedEvent event) {
+        List<ReservedLine> reserved = new ArrayList<>();
+
         return Flux.fromIterable(event.items())
-                .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line))
+                .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line)
+                        .doOnNext(reserved::add))
                 .collectList()
                 .flatMap(reservedLines -> {
                     InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
@@ -78,15 +81,20 @@ public class InventoryService {
                     log.error("Reservation failed for orderId={}, publishing InventoryFailedEvent: {}",
                             event.orderId(), reason);
 
-                    InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
-                    if (publisher == null) return Mono.empty();
+                    // Release stock for any lines that were already reserved before the failure
+                    return Flux.fromIterable(reserved)
+                            .flatMap(rl -> releaseStock(toProductId(rl.skuCode()), rl.quantity()))
+                            .then(Mono.defer(() -> {
+                                InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
+                                if (publisher == null) return Mono.empty();
 
-                    return publisher.publishFailedEvent(new InventoryFailedEvent(
-                            event.orderId(),
-                            skuCode,
-                            reason,
-                            Instant.now()
-                    ));
+                                return publisher.publishFailedEvent(new InventoryFailedEvent(
+                                        event.orderId(),
+                                        skuCode,
+                                        reason,
+                                        Instant.now()
+                                ));
+                            }));
                 });
     }
 
@@ -127,6 +135,9 @@ public class InventoryService {
      * because {@code order_id} is the primary key, a redelivered {@code payment.failed}
      * event (Kafka at-least-once) collides on insert and is skipped, so stock is never
      * credited twice. {@link #releaseStock(Long, int)} only runs after a fresh insert.
+     *
+     * <p>If {@link #releaseStock} fails after the marker was inserted, the marker is
+     * removed so the next Kafka redelivery can retry the compensation.
      */
     public Mono<Void> compensateReservation(Long orderId, Long productId, int quantity) {
         ProcessedCompensation marker = ProcessedCompensation.builder()
@@ -143,6 +154,16 @@ public class InventoryService {
                 .onErrorResume(this::isDuplicateCompensation, error -> {
                     log.info("Skipping duplicate compensation for orderId={} (already processed)", orderId);
                     return Mono.empty();
+                })
+                .onErrorResume(error -> {
+                    // Stock release failed after marker was inserted — remove the marker
+                    // so the next Kafka redelivery can retry the compensation.
+                    log.warn("Stock release failed for orderId={}, removing idempotency marker for retry: {}",
+                            orderId, error.getMessage());
+                    return entityTemplate.delete(ProcessedCompensation.class)
+                            .matching(query -> query.where("orderId").is(orderId))
+                            .then()
+                            .then(Mono.error(error));
                 });
     }
 
@@ -153,6 +174,10 @@ public class InventoryService {
 
     private String toSkuCode(Long productId) {
         return "SKU" + String.format("%03d", productId);
+    }
+
+    private Long toProductId(String skuCode) {
+        return Long.parseLong(skuCode.replace("SKU", ""));
     }
 
     private record ReservedLine(String skuCode, int quantity, int remainingQuantity) {}

@@ -34,6 +34,9 @@ public class FinanceService {
      * {@code order_id} is its primary key, a redelivered event collides on insert and
      * short-circuits before the transaction is written. A backstop UNIQUE constraint on
      * {@code transactions.order_id} provides the same guarantee for the ledger row itself.
+     *
+     * <p>If the transaction save fails after the marker was inserted, the marker is
+     * removed so the next Kafka redelivery can retry recording the transaction.
      */
     public Mono<Void> savePaymentTransaction(PaymentCompletedEvent event) {
         ProcessedPayment marker = ProcessedPayment.builder()
@@ -56,6 +59,16 @@ public class FinanceService {
                 .onErrorResume(this::isDuplicate, error -> {
                     log.info("Skipping duplicate payment transaction for orderId={} (already processed)", event.orderId());
                     return Mono.empty();
+                })
+                .onErrorResume(error -> {
+                    // Transaction save failed after marker was inserted — remove the marker
+                    // so the next Kafka redelivery can retry recording the transaction.
+                    log.warn("Transaction save failed for orderId={}, removing idempotency marker for retry: {}",
+                            event.orderId(), error.getMessage());
+                    return entityTemplate.delete(ProcessedPayment.class)
+                            .matching(query -> query.where("orderId").is(event.orderId()))
+                            .then()
+                            .then(Mono.error(error));
                 });
     }
 
