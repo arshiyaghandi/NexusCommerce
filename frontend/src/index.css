@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
 
 :root {
   --bg-dark: #0f172a;
@@ -9,11 +10,9 @@
   --accent-hover: #2563eb;
   --accent-secondary: #8b5cf6;
   --accent-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6);
-  
   --glass-bg: rgba(15, 23, 42, 0.6);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-  
   --border-radius: 16px;
   --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
@@ -27,7 +26,7 @@
 body {
   font-family: 'Inter', sans-serif;
   background-color: var(--bg-darker);
-  background-image: 
+  background-image:
     radial-gradient(circle at 15% 50%, rgba(59, 130, 246, 0.08), transparent 40%),
     radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.08), transparent 40%);
   background-attachment: fixed;
@@ -43,7 +42,6 @@ h1, h2, h3, h4, h5, h6 {
   line-height: 1.2;
 }
 
-/* Animations */
 @keyframes fadeInUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
@@ -55,6 +53,10 @@ h1, h2, h3, h4, h5, h6 {
   100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
 }
 
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
 .animate-fade-in-up {
   animation: fadeInUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   opacity: 0;
@@ -64,7 +66,10 @@ h1, h2, h3, h4, h5, h6 {
 .delay-200 { animation-delay: 200ms; }
 .delay-300 { animation-delay: 300ms; }
 
-/* Glassmorphism */
+.spin {
+  animation: spin 1s linear infinite;
+}
+
 .glass {
   background: var(--glass-bg);
   backdrop-filter: blur(16px);
@@ -85,7 +90,6 @@ h1, h2, h3, h4, h5, h6 {
   box-shadow: 0 15px 40px rgba(0, 0, 0, 0.4);
 }
 
-/* Buttons */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -124,19 +128,12 @@ h1, h2, h3, h4, h5, h6 {
   border-color: rgba(255, 255, 255, 0.2);
 }
 
-/* Layout */
 .container {
   max-width: 1280px;
   margin: 0 auto;
   padding: 0 2rem;
 }
 
-.grid { display: grid; gap: 2rem; }
-.grid-cols-2 { grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); }
-.grid-cols-3 { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.grid-cols-4 { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-
-/* Navbar */
 .navbar {
   position: sticky;
   top: 1rem;
@@ -180,8 +177,31 @@ h1, h2, h3, h4, h5, h6 {
   color: var(--accent-primary);
 }
 
-/* Utilities */
+.form-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  color: white;
+  font-size: 1rem;
+  outline: none;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  box-sizing: border-box;
+  font-family: 'Inter', sans-serif;
+}
+
+.form-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.form-input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
 .text-center { text-align: center; }
+.mt-4 { margin-top: 1rem; }
 .mt-8 { margin-top: 2rem; }
 .mb-8 { margin-bottom: 2rem; }
 .text-muted { color: var(--text-muted); }
@@ -192,7 +212,6 @@ h1, h2, h3, h4, h5, h6 {
 }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 
-/* Custom Scrollbar */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--bg-darker); }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }

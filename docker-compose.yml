@@ -43,6 +43,7 @@ services:
         condition: service_started
     networks:
       - nexus_network
+    restart: unless-stopped
 
   kafka:
     image: apache/kafka:latest

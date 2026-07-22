@@ -20,6 +20,6 @@ public class OrderLine {
     private Long id;
     private Long orderId;
     private Long productId;
-    private Integer quantity;
+    private int quantity;
     private BigDecimal unitPrice;
 }

@@ -28,8 +28,24 @@ public class KafkaTopicConfig {
     }
 
     @Bean
+    public NewTopic inventoryFailedTopic() {
+        return TopicBuilder.name(NexusTopics.INVENTORY_FAILED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
     public NewTopic paymentCompletedTopic() {
         return TopicBuilder.name(NexusTopics.PAYMENT_COMPLETED)
+                .partitions(3)
+                .replicas(1)
+                .build();
+    }
+
+    @Bean
+    public NewTopic paymentFailedTopic() {
+        return TopicBuilder.name(NexusTopics.PAYMENT_FAILED)
                 .partitions(3)
                 .replicas(1)
                 .build();

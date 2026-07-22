@@ -66,6 +66,18 @@ public class AuthController {
                 user.setUsername(request.getUsername());
                 user.setEnabled(true);
                 
+                // Set email, firstName, lastName if provided
+                if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                    user.setEmail(request.getEmail());
+                    user.setEmailVerified(true);
+                }
+                if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
+                    user.setFirstName(request.getFirstName());
+                }
+                if (request.getLastName() != null && !request.getLastName().isBlank()) {
+                    user.setLastName(request.getLastName());
+                }
+                
                 org.keycloak.representations.idm.CredentialRepresentation cred = new org.keycloak.representations.idm.CredentialRepresentation();
                 cred.setType(org.keycloak.representations.idm.CredentialRepresentation.PASSWORD);
                 cred.setValue(request.getPassword());
@@ -79,16 +91,25 @@ public class AuthController {
                     String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
                     
                     // Assign 'user' role
-                    org.keycloak.representations.idm.RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
-                    keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(java.util.Collections.singletonList(userRole));
+                    try {
+                        org.keycloak.representations.idm.RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
+                        keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(java.util.Collections.singletonList(userRole));
+                    } catch (Exception roleEx) {
+                        // Role assignment failed but user was created - log and continue
+                        System.err.println("Warning: User created but role assignment failed: " + roleEx.getMessage());
+                    }
                     
                     return org.springframework.http.ResponseEntity.status(HttpStatus.CREATED).body((Object) Map.of("message", "User created successfully"));
+                } else if (response.getStatus() == 409) {
+                    return org.springframework.http.ResponseEntity.status(HttpStatus.CONFLICT).body((Object) Map.of("error", "Username already exists. Please choose a different one."));
                 } else {
-                    return org.springframework.http.ResponseEntity.status(response.getStatus()).body((Object) Map.of("error", "Failed to create user. Status: " + response.getStatus()));
+                    String body = "";
+                    try { body = response.readEntity(String.class); } catch (Exception ignored) {}
+                    return org.springframework.http.ResponseEntity.status(response.getStatus()).body((Object) Map.of("error", "Registration failed: " + body));
                 }
             } catch (Exception e) {
                 e.printStackTrace();
-                return org.springframework.http.ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) Map.of("error", e.getMessage()));
+                return org.springframework.http.ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) Map.of("error", "Internal error: " + e.getMessage()));
             }
         }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
     }
