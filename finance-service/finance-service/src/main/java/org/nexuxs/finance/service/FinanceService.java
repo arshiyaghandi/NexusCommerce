@@ -10,6 +10,8 @@ import org.nexuxs.finance.data.repository.TransactionRepository;
 import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.relational.core.query.Criteria;
+import org.springframework.data.relational.core.query.Query;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
@@ -65,9 +67,10 @@ public class FinanceService {
                     // so the next Kafka redelivery can retry recording the transaction.
                     log.warn("Transaction save failed for orderId={}, removing idempotency marker for retry: {}",
                             event.orderId(), error.getMessage());
+                    Query deleteQuery = Query.query(Criteria.where("orderId").is(event.orderId()));
                     return entityTemplate.delete(ProcessedPayment.class)
-                            .matching(query -> query.where("orderId").is(event.orderId()))
-                            .then()
+                            .matching(deleteQuery)
+                            .all()
                             .then(Mono.error(error));
                 });
     }
