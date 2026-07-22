@@ -15,6 +15,8 @@ import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.http.HttpStatus;
+import org.springframework.data.relational.core.query.Criteria;
+import org.springframework.data.relational.core.query.Query;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -142,6 +144,7 @@ public class InventoryService {
     public Mono<Void> compensateReservation(Long orderId, Long productId, int quantity) {
         ProcessedCompensation marker = ProcessedCompensation.builder()
                 .orderId(orderId)
+                .productId(productId)
                 .processedAt(LocalDateTime.now())
                 .build();
 
@@ -156,13 +159,14 @@ public class InventoryService {
                     return Mono.empty();
                 })
                 .onErrorResume(error -> {
-                    // Stock release failed after marker was inserted — remove the marker
-                    // so the next Kafka redelivery can retry the compensation.
-                    log.warn("Stock release failed for orderId={}, removing idempotency marker for retry: {}",
-                            orderId, error.getMessage());
+
+                    log.warn("Stock release failed for orderId={}, productId={}, removing idempotency marker for retry: {}",
+                            orderId, productId, error.getMessage());
+                    Query deleteQuery = Query.query(Criteria.where("orderId").is(orderId)
+                            .and("productId").is(productId));
                     return entityTemplate.delete(ProcessedCompensation.class)
-                            .matching(query -> query.where("orderId").is(orderId))
-                            .then()
+                            .matching(deleteQuery)
+                            .all()
                             .then(Mono.error(error));
                 });
     }
