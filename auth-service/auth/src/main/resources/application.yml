@@ -24,7 +24,7 @@ spring:
             issuer-uri: http://localhost:8081/realms/nexus-realm
 
 recaptcha:
-  secret-key: ${RECAPTCHA_SECRET_KEY:REPLACE_WITH_YOUR_SECRET_KEY}
+  secret-key: ${RECAPTCHA_SECRET_KEY:6LdYqmAtAAAAAIWq3-GSTEhzfbD0dL0Y0o7a2rSB}
 
 eureka:
   client:
