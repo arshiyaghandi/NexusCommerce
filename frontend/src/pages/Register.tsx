@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowRight, Lock, User, Mail, UserCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { register } from '../api/auth';
 import { useToast } from '../contexts/ToastContext';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 const inputStyle = {
   width: '100%',
@@ -124,12 +125,14 @@ export default function Register() {
 
     setIsLoading(true);
     try {
+      const recaptchaToken = await executeRecaptcha('register');
       await register({
         username: formData.username,
         password: formData.password,
         email: formData.email || undefined,
         firstName: formData.firstName || undefined,
         lastName: formData.lastName || undefined,
+        recaptchaToken,
       });
       addToast('Registration successful! Redirecting to login...', 'success');
       setTimeout(() => navigate('/login'), 2000);

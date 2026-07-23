@@ -6,11 +6,11 @@ public class RegisterRequest {
     private String email;
     private String firstName;
     private String lastName;
-    
-    // Getters and Setters
+    private String recaptchaToken;
+
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
-    
+
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
@@ -22,4 +22,7 @@ public class RegisterRequest {
 
     public String getLastName() { return lastName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
+
+    public String getRecaptchaToken() { return recaptchaToken; }
+    public void setRecaptchaToken(String recaptchaToken) { this.recaptchaToken = recaptchaToken; }
 }

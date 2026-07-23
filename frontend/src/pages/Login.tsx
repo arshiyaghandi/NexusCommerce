@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -18,6 +19,7 @@ export default function Login() {
     e.preventDefault();
     setIsLoading(true);
     try {
+      await executeRecaptcha('login');
       await login(username, password);
       addToast('Welcome back to NexusCommerce!', 'success');
       navigate(redirectTo, { replace: true });

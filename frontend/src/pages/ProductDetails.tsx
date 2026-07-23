@@ -12,9 +12,9 @@ export default function ProductDetails() {
   const productId = Number(id);
   const { data: product, isLoading: productLoading } = useProduct(productId);
   const [quantity, setQuantity] = useState(1);
-  const { addItem } = useCart(!!user);
   const { addToast } = useToast();
   const { user } = useAuth();
+  const { addItem } = useCart(!!user);
   const navigate = useNavigate();
   const location = useLocation();
 

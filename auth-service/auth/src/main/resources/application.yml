@@ -23,6 +23,9 @@ spring:
           keycloak:
             issuer-uri: http://localhost:8081/realms/nexus-realm
 
+recaptcha:
+  secret-key: ${RECAPTCHA_SECRET_KEY:6LdYqmAtAAAAAJzPCa7juiJpdB6foJM8ATrERvif}
+
 eureka:
   client:
     register-with-eureka: true
