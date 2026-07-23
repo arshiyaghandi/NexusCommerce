@@ -8,6 +8,14 @@ export default defineConfig({
     port: 3000,
     strictPort: true,
     proxy: {
+      '/api/auth/captcha': {
+        target: 'http://localhost:8091',
+        changeOrigin: true,
+      },
+      '/api/auth/register': {
+        target: 'http://localhost:8091',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
