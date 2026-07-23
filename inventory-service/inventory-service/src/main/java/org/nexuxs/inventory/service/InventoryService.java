@@ -1,5 +1,6 @@
 package org.nexuxs.inventory.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.inventory.data.dto.InventoryResponse;
@@ -14,6 +15,7 @@ import org.nexuxs.messaging.contracts.event.ReservedLineRecord;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.data.relational.core.query.Criteria;
 import org.springframework.data.relational.core.query.Query;
@@ -24,6 +26,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -34,15 +37,42 @@ import java.util.List;
 @Slf4j
 public class InventoryService {
 
+    private static final String CACHE_KEY_PREFIX = "inventory:";
+    private static final Duration CACHE_TTL = Duration.ofMinutes(5);
+
     private final InventoryRepository inventoryRepository;
     private final ObjectProvider<InventoryEventPublisher> publisherProvider;
     private final R2dbcEntityTemplate entityTemplate;
+    private final ReactiveStringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public Mono<InventoryResponse> getStock(String skuCode) {
-        return inventoryRepository.findBySkuCode(skuCode)
-                .map(item -> new InventoryResponse(item.getSkuCode(), item.getQuantity()))
+        String cacheKey = CACHE_KEY_PREFIX + skuCode;
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(json -> {
+                    try {
+                        return Mono.just(objectMapper.readValue(json, InventoryResponse.class));
+                    } catch (Exception e) {
+                        return Mono.error(new IllegalStateException("Failed to deserialize cached inventory", e));
+                    }
+                })
+                .switchIfEmpty(inventoryRepository.findBySkuCode(skuCode)
+                        .map(item -> new InventoryResponse(item.getSkuCode(), item.getQuantity()))
+                        .flatMap(response -> {
+                            try {
+                                String json = objectMapper.writeValueAsString(response);
+                                return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
+                                        .thenReturn(response);
+                            } catch (Exception e) {
+                                return Mono.just(response);
+                            }
+                        }))
                 .switchIfEmpty(Mono.error(new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "SKU not found: " + skuCode)));
+    }
+
+    private Mono<Void> invalidateCache(String skuCode) {
+        return redisTemplate.delete(CACHE_KEY_PREFIX + skuCode).then();
     }
 
     /**
@@ -117,7 +147,8 @@ public class InventoryService {
                             orderId, skuCode, requestedQuantity);
                     return Mono.error(new IllegalStateException("INSUFFICIENT_STOCK"));
                 }))
-                .map(saved -> new ReservedLine(skuCode, requestedQuantity, saved.getQuantity()));
+                .flatMap(saved -> invalidateCache(skuCode)
+                        .thenReturn(new ReservedLine(skuCode, requestedQuantity, saved.getQuantity())));
     }
 
     public Mono<Void> releaseStock(Long productId, int quantity) {
@@ -128,7 +159,7 @@ public class InventoryService {
                     return inventoryRepository.save(item)
                             .doOnSuccess(saved -> log.info("Compensating action: Released {} units of {} back to inventory.", quantity, skuCode));
                 })
-                .then();
+                .then(invalidateCache(skuCode));
     }
 
     /**

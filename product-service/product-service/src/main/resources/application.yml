@@ -8,6 +8,11 @@ spring:
     url: r2dbc:postgresql://localhost:5433/product_db
     username: admin
     password: admin
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      database: 4
   security:
     oauth2:
       resourceserver:

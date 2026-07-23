@@ -1,5 +1,8 @@
 package org.nexuxs.auth.api;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.server.reactive.ServerHttpResponse;
@@ -11,11 +14,19 @@ import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Mono;
 
 import java.net.URI;
+import java.time.Duration;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
+@RequiredArgsConstructor
 public class AuthController {
+
+    private static final String USER_CACHE_PREFIX = "auth:user:";
+    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
+
+    private final ReactiveStringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @GetMapping("/success")
     public Mono<Void> loginSuccess(@AuthenticationPrincipal OidcUser oidcUser, ServerHttpResponse response) {
@@ -44,11 +55,33 @@ public class AuthController {
             return Mono.just(Map.of("error", "User not authenticated"));
         }
 
-        return Mono.just(Map.of(
-                "name", oidcUser.getFullName() != null ? oidcUser.getFullName() : oidcUser.getPreferredUsername(),
-                "email", oidcUser.getEmail() != null ? oidcUser.getEmail() : "No Email",
-                "roles", oidcUser.getAuthorities()
-        ));
+        String userId = oidcUser.getSubject();
+        String cacheKey = USER_CACHE_PREFIX + userId;
+
+        return redisTemplate.opsForValue().get(cacheKey)
+                .flatMap(json -> {
+                    try {
+                        @SuppressWarnings("unchecked")
+                        Map<String, Object> cached = objectMapper.readValue(json, Map.class);
+                        return Mono.just(cached);
+                    } catch (Exception e) {
+                        return Mono.error(e);
+                    }
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    Map<String, Object> profile = Map.of(
+                            "name", oidcUser.getFullName() != null ? oidcUser.getFullName() : oidcUser.getPreferredUsername(),
+                            "email", oidcUser.getEmail() != null ? oidcUser.getEmail() : "No Email",
+                            "roles", oidcUser.getAuthorities()
+                    );
+                    try {
+                        String json = objectMapper.writeValueAsString(profile);
+                        return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
+                                .thenReturn(profile);
+                    } catch (Exception e) {
+                        return Mono.just(profile);
+                    }
+                }));
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/register")
@@ -61,12 +94,11 @@ public class AuthController {
                     .username("admin")
                     .password("admin")
                     .build()) {
-                
+
                 org.keycloak.representations.idm.UserRepresentation user = new org.keycloak.representations.idm.UserRepresentation();
                 user.setUsername(request.getUsername());
                 user.setEnabled(true);
-                
-                // Set email, firstName, lastName if provided
+
                 if (request.getEmail() != null && !request.getEmail().isBlank()) {
                     user.setEmail(request.getEmail());
                     user.setEmailVerified(true);
@@ -77,28 +109,25 @@ public class AuthController {
                 if (request.getLastName() != null && !request.getLastName().isBlank()) {
                     user.setLastName(request.getLastName());
                 }
-                
+
                 org.keycloak.representations.idm.CredentialRepresentation cred = new org.keycloak.representations.idm.CredentialRepresentation();
                 cred.setType(org.keycloak.representations.idm.CredentialRepresentation.PASSWORD);
                 cred.setValue(request.getPassword());
                 cred.setTemporary(false);
                 user.setCredentials(java.util.Collections.singletonList(cred));
-                
+
                 jakarta.ws.rs.core.Response response = keycloak.realm("nexus-realm").users().create(user);
-                
+
                 if (response.getStatus() == 201) {
-                    // Get the created user ID
                     String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
-                    
-                    // Assign 'user' role
+
                     try {
                         org.keycloak.representations.idm.RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
                         keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(java.util.Collections.singletonList(userRole));
                     } catch (Exception roleEx) {
-                        // Role assignment failed but user was created - log and continue
                         System.err.println("Warning: User created but role assignment failed: " + roleEx.getMessage());
                     }
-                    
+
                     return org.springframework.http.ResponseEntity.status(HttpStatus.CREATED).body((Object) Map.of("message", "User created successfully"));
                 } else if (response.getStatus() == 409) {
                     return org.springframework.http.ResponseEntity.status(HttpStatus.CONFLICT).body((Object) Map.of("error", "Username already exists. Please choose a different one."));
