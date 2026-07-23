@@ -3,23 +3,31 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Lock, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { executeRecaptcha } from '../utils/recaptcha';
+import MathCaptcha from '../components/MathCaptcha';
 
 export default function Login() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [captchaVerified, setCaptchaVerified] = useState(false);
   const { login } = useAuth();
   const { addToast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirect') || '/';
 
+  const handleCaptchaVerify = (id: string, answer: string) => {
+    setCaptchaVerified(!!id && !!answer);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!captchaVerified) {
+      addToast('Please complete the captcha', 'error');
+      return;
+    }
     setIsLoading(true);
     try {
-      await executeRecaptcha('login');
       await login(username, password);
       addToast('Welcome back to NexusCommerce!', 'success');
       navigate(redirectTo, { replace: true });
@@ -81,6 +89,8 @@ export default function Login() {
               />
             </div>
           </div>
+
+          <MathCaptcha onVerify={handleCaptchaVerify} />
 
           <button
             type="submit"

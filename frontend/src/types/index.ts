@@ -55,7 +55,8 @@ export interface RegisterRequest {
   email?: string;
   firstName?: string;
   lastName?: string;
-  recaptchaToken?: string;
+  captchaId?: string;
+  captchaAnswer?: string;
 }
 
 export interface AuthUser {
