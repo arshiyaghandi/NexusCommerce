@@ -10,9 +10,9 @@ export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const { data: products, isLoading } = useProducts(searchQuery || undefined);
-  const { addItem } = useCart(!!user);
   const { addToast } = useToast();
   const { user } = useAuth();
+  const { addItem } = useCart(!!user);
   const navigate = useNavigate();
   const location = useLocation();
 
