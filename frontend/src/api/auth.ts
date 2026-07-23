@@ -75,7 +75,7 @@ export function checkAuth(): AuthUser | null {
   }
 }
 
-export async function register(data: RegisterRequest): Promise<{ message: string }> {
+export async function register(data: RegisterRequest & { recaptchaToken?: string }): Promise<{ message: string }> {
   const response = await axios.post(`${AUTH_SERVICE_URL}/register`, data, {
     headers: { 'Content-Type': 'application/json' },
   });
