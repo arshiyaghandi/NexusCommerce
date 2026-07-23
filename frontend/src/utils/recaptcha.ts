@@ -4,9 +4,7 @@ declare global {
   interface Window {
     grecaptcha: {
       ready: (callback: () => void) => void;
-      render: (container: string | HTMLElement, options: { sitekey: string; callback: (token: string) => void }) => number;
-      reset: (widgetId: number) => void;
-      getResponse: (widgetId: number) => string;
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
     };
   }
 }
@@ -18,27 +16,20 @@ function loadRecaptchaScript(): Promise<void> {
       return;
     }
     const script = document.createElement('script');
-    script.src = 'https://www.google.com/recaptcha/api.js';
+    script.src = `https://www.google.com/recaptcha/api.js?render=${RECAPTCHA_SITE_KEY}`;
     script.onload = () => resolve();
     script.onerror = () => reject(new Error('Failed to load reCAPTCHA'));
     document.head.appendChild(script);
   });
 }
 
-export function renderRecaptcha(container: HTMLElement, callback: (token: string) => void): Promise<number> {
-  return loadRecaptchaScript().then(() => {
-    return new Promise<number>((resolve) => {
-      window.grecaptcha.ready(() => {
-        const widgetId = window.grecaptcha.render(container, {
-          sitekey: RECAPTCHA_SITE_KEY,
-          callback,
-        });
-        resolve(widgetId);
-      });
+export async function executeRecaptcha(action: string): Promise<string> {
+  await loadRecaptchaScript();
+  return new Promise((resolve, reject) => {
+    window.grecaptcha.ready(() => {
+      window.grecaptcha.execute(RECAPTCHA_SITE_KEY, { action })
+        .then(resolve)
+        .catch(reject);
     });
   });
-}
-
-export function resetRecaptcha(widgetId: number): void {
-  window.grecaptcha.reset(widgetId);
 }

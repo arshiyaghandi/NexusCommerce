@@ -1,9 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowRight, Lock, User, Mail, UserCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { register } from '../api/auth';
 import { useToast } from '../contexts/ToastContext';
-import { renderRecaptcha, resetRecaptcha } from '../utils/recaptcha';
+import { executeRecaptcha } from '../utils/recaptcha';
 
 const inputStyle = {
   width: '100%',
@@ -100,21 +100,8 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-  const [recaptchaToken, setRecaptchaToken] = useState('');
-  const recaptchaRef = useRef<HTMLDivElement>(null);
-  const widgetIdRef = useRef<number>(0);
   const navigate = useNavigate();
   const { addToast } = useToast();
-
-  useEffect(() => {
-    if (recaptchaRef.current) {
-      renderRecaptcha(recaptchaRef.current, (token) => {
-        setRecaptchaToken(token);
-      }).then((id) => {
-        widgetIdRef.current = id;
-      });
-    }
-  }, []);
 
   const handleChange = (field: keyof FormFields) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
@@ -135,13 +122,10 @@ export default function Register() {
       addToast('Username is required', 'error');
       return;
     }
-    if (!recaptchaToken) {
-      addToast('Please complete the CAPTCHA verification', 'error');
-      return;
-    }
 
     setIsLoading(true);
     try {
+      const recaptchaToken = await executeRecaptcha('register');
       await register({
         username: formData.username,
         password: formData.password,
@@ -154,8 +138,6 @@ export default function Register() {
       setTimeout(() => navigate('/login'), 2000);
     } catch (err) {
       addToast(err instanceof Error ? err.message : 'Registration failed', 'error');
-      resetRecaptcha(widgetIdRef.current);
-      setRecaptchaToken('');
     } finally {
       setIsLoading(false);
     }
@@ -277,10 +259,6 @@ export default function Register() {
                 <CheckCircle2 size={12} /> Passwords match
               </p>
             )}
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <div ref={recaptchaRef}></div>
           </div>
 
           <button
