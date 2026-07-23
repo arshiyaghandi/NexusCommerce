@@ -1,5 +1,6 @@
 package org.nexuxs.order.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.order.client.CartClient;
@@ -14,6 +15,7 @@ import org.nexuxs.order.data.repository.OrderLineRepository;
 import org.nexuxs.order.data.repository.OrderRepository;
 import org.nexuxs.order.messaging.OrderEventPublisher;
 import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.security.core.context.ReactiveSecurityContextHolder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.util.List;
 
 @Service
@@ -28,11 +31,16 @@ import java.util.List;
 @RequiredArgsConstructor
 public class OrderService {
 
+    private static final String CACHE_KEY_PREFIX = "order:";
+    private static final Duration CACHE_TTL = Duration.ofMinutes(2);
+
     private final OrderRepository orderRepository;
     private final OrderLineRepository orderLineRepository;
     private final CartClient cartClient;
     private final ProductClient productClient;
     private final ObjectProvider<OrderEventPublisher> orderEventPublisherProvider;
+    private final ReactiveStringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     public Flux<OrderResponse> myOrders() {
         return currentUserId()
@@ -42,11 +50,33 @@ public class OrderService {
     }
 
     public Mono<OrderResponse> getOrder(Long orderId) {
+        String cacheKey = CACHE_KEY_PREFIX + orderId;
         return currentUserId()
-                .flatMap(userId -> orderRepository.findById(orderId)
-                        .filter(order -> userId.equals(order.getUserId()))
-                        .flatMap(order -> loadOrderLines(order)
-                                .map(lines -> toResponse(order, lines)))
+                .flatMap(userId -> redisTemplate.opsForValue().get(cacheKey)
+                        .flatMap(json -> {
+                            try {
+                                OrderResponse cached = objectMapper.readValue(json, OrderResponse.class);
+                                if (userId.equals(cached.userId())) {
+                                    return Mono.just(cached);
+                                }
+                                return Mono.empty();
+                            } catch (Exception e) {
+                                return Mono.empty();
+                            }
+                        })
+                        .switchIfEmpty(orderRepository.findById(orderId)
+                                .filter(order -> userId.equals(order.getUserId()))
+                                .flatMap(order -> loadOrderLines(order)
+                                        .map(lines -> toResponse(order, lines)))
+                                .flatMap(response -> {
+                                    try {
+                                        String json = objectMapper.writeValueAsString(response);
+                                        return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
+                                                .thenReturn(response);
+                                    } catch (Exception e) {
+                                        return Mono.just(response);
+                                    }
+                                }))
                         .switchIfEmpty(Mono.error(new IllegalStateException("Order not found"))));
     }
 
@@ -75,7 +105,6 @@ public class OrderService {
     }
 
     private Mono<Order> validateAndBuildOrder(String userId, List<CartItemDto> cartItems) {
-        // Validate each product exists and compute server-side total
         return Flux.fromIterable(cartItems)
                 .flatMap(cartItem -> productClient.getProduct(cartItem.productId())
                         .map(product -> {
@@ -122,28 +151,14 @@ public class OrderService {
                 .collectList();
     }
 
-    /**
-     * Saga: applies the outcome of the payment step. Success completes the order,
-     * failure cancels it (the reserved stock is compensated independently by
-     * inventory-service reacting to the same {@code payment.failed} event).
-     */
     public Mono<Order> applyPaymentOutcome(Long orderId, boolean paymentSucceeded) {
         return transitionTo(orderId, paymentSucceeded ? OrderStatus.COMPLETED : OrderStatus.CANCELLED);
     }
 
-    /**
-     * Saga: rejects an order whose inventory reservation failed. No stock was ever
-     * decremented, so there is nothing to compensate — the order simply never qualified.
-     */
     public Mono<Order> applyInventoryFailure(Long orderId) {
         return transitionTo(orderId, OrderStatus.REJECTED);
     }
 
-    /**
-     * Idempotent terminal-state transition. Orders that already reached a terminal
-     * status are left untouched, so redelivered Saga events (Kafka at-least-once) are
-     * safe no-ops.
-     */
     private Mono<Order> transitionTo(Long orderId, OrderStatus target) {
         return orderRepository.findById(orderId)
                 .switchIfEmpty(Mono.error(new IllegalStateException(
@@ -157,7 +172,10 @@ public class OrderService {
                     order.setStatus(target);
                     return orderRepository.save(order)
                             .doOnNext(saved -> log.info("Order {} transitioned to {}", orderId, target));
-                });
+                })
+                .then(redisTemplate.delete(CACHE_KEY_PREFIX + orderId).then(orderRepository.findById(orderId)))
+                .switchIfEmpty(Mono.error(new IllegalStateException(
+                        "Cannot transition order: not found, orderId=" + orderId)));
     }
 
     private boolean isTerminal(OrderStatus status) {
