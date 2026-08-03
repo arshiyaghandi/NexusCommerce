@@ -68,6 +68,56 @@ spring:
           uri: lb://recommendation-service
           predicates:
             - Path=/api/recommendations/**
+
+        # ─── Swagger API-docs proxy routes (for aggregated Swagger UI) ───────────
+        - id: order-service-docs
+          uri: lb://order-service
+          predicates:
+            - Path=/order-service/v3/api-docs
+          filters:
+            - RewritePath=/order-service/v3/api-docs, /v3/api-docs
+        - id: inventory-service-docs
+          uri: lb://inventory-service
+          predicates:
+            - Path=/inventory-service/v3/api-docs
+          filters:
+            - RewritePath=/inventory-service/v3/api-docs, /v3/api-docs
+        - id: product-service-docs
+          uri: lb://product-service
+          predicates:
+            - Path=/product-service/v3/api-docs
+          filters:
+            - RewritePath=/product-service/v3/api-docs, /v3/api-docs
+        - id: cart-service-docs
+          uri: lb://cart-service
+          predicates:
+            - Path=/cart-service/v3/api-docs
+          filters:
+            - RewritePath=/cart-service/v3/api-docs, /v3/api-docs
+        - id: payment-service-docs
+          uri: lb://payment-service
+          predicates:
+            - Path=/payment-service/v3/api-docs
+          filters:
+            - RewritePath=/payment-service/v3/api-docs, /v3/api-docs
+        - id: finance-service-docs
+          uri: lb://finance-service
+          predicates:
+            - Path=/finance-service/v3/api-docs
+          filters:
+            - RewritePath=/finance-service/v3/api-docs, /v3/api-docs
+        - id: messaging-service-docs
+          uri: lb://messaging-service
+          predicates:
+            - Path=/messaging-service/v3/api-docs
+          filters:
+            - RewritePath=/messaging-service/v3/api-docs, /v3/api-docs
+        - id: auth-service-docs
+          uri: lb://auth-service
+          predicates:
+            - Path=/auth-service/v3/api-docs
+          filters:
+            - RewritePath=/auth-service/v3/api-docs, /v3/api-docs
   security:
     oauth2:
       resourceserver:
@@ -85,3 +135,47 @@ eureka:
     fetch-registry: true
     service-url:
       defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus,metrics,env
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: when-authorized
+    prometheus:
+      enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
+      platform: nexus-commerce
+
+# Swagger UI Aggregation — collect API docs from all downstream services
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: api-gateway
+        url: /v3/api-docs
+      - name: order-service
+        url: /order-service/v3/api-docs
+      - name: inventory-service
+        url: /inventory-service/v3/api-docs
+      - name: product-service
+        url: /product-service/v3/api-docs
+      - name: cart-service
+        url: /cart-service/v3/api-docs
+      - name: payment-service
+        url: /payment-service/v3/api-docs
+      - name: finance-service
+        url: /finance-service/v3/api-docs
+      - name: messaging-service
+        url: /messaging-service/v3/api-docs
+      - name: auth-service
+        url: /auth-service/v3/api-docs
+  api-docs:
+    path: /v3/api-docs

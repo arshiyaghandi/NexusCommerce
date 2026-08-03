@@ -32,6 +32,15 @@ public class SecurityConfig {
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers(org.springframework.http.HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/actuator/**", "/ws/**", "/api/auth/**").permitAll()
+                        // Swagger UI & API docs (aggregated from all services)
+                        .pathMatchers(
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/v3/api-docs",
+                                "/webjars/**",
+                                "/*/v3/api-docs"
+                        ).permitAll()
                         .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll()
                         .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/inventory/**").permitAll()
                         .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
