@@ -23,6 +23,11 @@ public class OrderAPI {
         return orderService.myOrders();
     }
 
+    @GetMapping("/all")
+    public Flux<OrderResponse> getAllOrders() {
+        return orderService.getAllOrders();
+    }
+
     @GetMapping("/{orderId}")
     public Mono<OrderResponse> getOrder(@PathVariable Long orderId) {
         return orderService.getOrder(orderId);

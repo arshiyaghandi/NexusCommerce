@@ -49,6 +49,12 @@ public class OrderService {
                                 .map(lines -> toResponse(order, lines))));
     }
 
+    public Flux<OrderResponse> getAllOrders() {
+        return orderRepository.findAllByOrderByCreatedAtDesc()
+                .flatMap(order -> loadOrderLines(order)
+                        .map(lines -> toResponse(order, lines)));
+    }
+
     public Mono<OrderResponse> getOrder(Long orderId) {
         String cacheKey = CACHE_KEY_PREFIX + orderId;
         return currentUserId()

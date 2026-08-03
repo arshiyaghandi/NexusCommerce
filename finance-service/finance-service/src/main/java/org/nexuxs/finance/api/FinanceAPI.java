@@ -26,4 +26,14 @@ public class FinanceAPI {
     public Mono<FinanceSummaryResponse> getSummary() {
         return financeService.getCurrentUserSummary();
     }
+
+    @GetMapping("/admin/transactions")
+    public Flux<Transaction> getAdminTransactions() {
+        return financeService.getPlatformTransactions();
+    }
+
+    @GetMapping("/admin/summary")
+    public Mono<FinanceSummaryResponse> getAdminSummary() {
+        return financeService.getPlatformSummary();
+    }
 }

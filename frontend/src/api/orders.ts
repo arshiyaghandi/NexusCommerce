@@ -15,3 +15,8 @@ export async function placeOrder(): Promise<string> {
   const response = await api.post<string>('/orders');
   return response.data;
 }
+
+export async function getAllOrders(): Promise<OrderResponse[]> {
+  const response = await api.get<OrderResponse[]>('/orders/all');
+  return response.data;
+}

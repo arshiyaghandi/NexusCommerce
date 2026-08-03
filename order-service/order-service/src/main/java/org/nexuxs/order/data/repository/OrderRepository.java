@@ -6,4 +6,6 @@ import org.springframework.data.repository.reactive.ReactiveCrudRepository;
 public interface OrderRepository extends ReactiveCrudRepository<Order, Long> {
 
     reactor.core.publisher.Flux<Order> findByUserId(String userId);
+
+    reactor.core.publisher.Flux<Order> findAllByOrderByCreatedAtDesc();
 }

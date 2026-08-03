@@ -1,12 +1,14 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { ShoppingBag, Zap, ShieldCheck, Truck, ShoppingCart, ArrowRight } from 'lucide-react';
+import { ShoppingBag, Zap, ShieldCheck, Truck, ShoppingCart, ArrowRight, Sparkles } from 'lucide-react';
 import { useProducts } from '../hooks/useProducts';
+import { useRecommendations } from '../hooks/useRecommendations';
 import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function Home() {
   const { data: products, isLoading } = useProducts();
+  const { data: recommendations } = useRecommendations();
   const { addToast } = useToast();
   const { user } = useAuth();
   const { addItem } = useCart(!!user);
@@ -14,6 +16,13 @@ export default function Home() {
   const location = useLocation();
 
   const featuredProducts = products?.slice(0, 3) ?? [];
+  
+  const recommendedProducts = recommendations
+    ? recommendations.map(r => {
+        const prod = products?.find(p => p.id === r.productId);
+        return prod ? { ...prod, aiReason: r.reason } : null;
+      }).filter((p): p is NonNullable<typeof p> => p !== null)
+    : [];
 
   const handleAddToCart = async (product: NonNullable<typeof products>[number]) => {
     if (!user) {
@@ -131,6 +140,42 @@ export default function Home() {
           </div>
         )}
       </section>
+
+      {/* Recommended Products Section */}
+      {user && recommendedProducts.length > 0 && (
+        <section className="mb-8 animate-fade-in-up delay-100">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '2rem' }}>
+            <Sparkles color="var(--accent-primary)" />
+            <h2 style={{ margin: 0 }}>Recommended for You</h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
+            {recommendedProducts.map((product) => (
+              <div key={product.id} className="glass glass-card" style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}>
+                <div style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--accent-gradient)', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}>
+                  {product.aiReason}
+                </div>
+                <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                  <div style={{ height: '150px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', width: '100px', height: '100px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.5 }} />
+                  </div>
+                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{product.name}</h3>
+                  <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem' }}>
+                    {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
+                  </p>
+                </Link>
+                <div className="flex-between" style={{ marginTop: 'auto' }}>
+                  <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
+                    ${product.price}
+                  </span>
+                  <button className="btn btn-primary" onClick={() => handleAddToCart(product)}>
+                    <ShoppingCart size={16} /> Add
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Features Section */}
       <section className="mb-8 animate-fade-in-up delay-100">

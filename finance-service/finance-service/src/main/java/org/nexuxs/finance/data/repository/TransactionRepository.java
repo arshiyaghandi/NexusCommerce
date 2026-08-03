@@ -10,4 +10,6 @@ public interface TransactionRepository extends ReactiveCrudRepository<Transactio
     Flux<Transaction> findByUserIdOrderByCreatedAtDesc(String userId);
 
     Mono<Long> countByUserId(String userId);
+
+    Flux<Transaction> findAllByOrderByCreatedAtDesc();
 }
