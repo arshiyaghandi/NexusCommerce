@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Activity, DollarSign, CreditCard, Plus, Edit2, Trash2, X } from 'lucide-react';
-import { useTransactions, useFinanceSummary } from '../hooks/useFinance';
+import { Activity, DollarSign, CreditCard, Plus, Edit2, Trash2, X, Package } from 'lucide-react';
+import { useAdminTransactions, useAdminFinanceSummary } from '../hooks/useFinance';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
+import { useAdminOrders } from '../hooks/useOrders';
 import { useToast } from '../contexts/ToastContext';
 import type { Product } from '../types';
 
@@ -15,20 +16,21 @@ interface ProductFormData {
 const emptyForm: ProductFormData = { skuCode: '', name: '', description: '', price: '' };
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'orders'>('overview');
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<ProductFormData>(emptyForm);
 
   const { addToast } = useToast();
-  const { data: summary, isLoading: summaryLoading } = useFinanceSummary();
-  const { data: transactions = [] } = useTransactions();
+  const { data: summary, isLoading: summaryLoading } = useAdminFinanceSummary();
+  const { data: transactions = [] } = useAdminTransactions();
   const { data: products = [], isLoading: productsLoading } = useProducts();
+  const { data: orders = [], isLoading: ordersLoading } = useAdminOrders();
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
 
-  const loading = summaryLoading || productsLoading;
+  const loading = summaryLoading || productsLoading || ordersLoading;
 
   const handleOpenAdd = () => {
     setEditingProduct(null);
@@ -86,7 +88,7 @@ export default function AdminDashboard() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
         <h2 style={{ margin: 0 }}>Admin Dashboard</h2>
         <div style={{ display: 'flex', gap: '0.5rem', background: 'rgba(255,255,255,0.05)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--glass-border)' }}>
-          {(['overview', 'products'] as const).map((tab) => (
+          {(['overview', 'products', 'orders'] as const).map((tab) => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -104,7 +106,7 @@ export default function AdminDashboard() {
         </div>
       </div>
 
-      {activeTab === 'overview' ? (
+      {activeTab === 'overview' && (
         <>
           {/* Summary Cards */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', marginBottom: '3rem' }}>
@@ -183,7 +185,9 @@ export default function AdminDashboard() {
             )}
           </div>
         </>
-      ) : (
+      )}
+      
+      {activeTab === 'products' && (
         /* Products Tab */
         <div className="glass" style={{ padding: '2rem' }}>
           <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
@@ -227,6 +231,50 @@ export default function AdminDashboard() {
                             <Trash2 size={14} />
                           </button>
                         </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === 'orders' && (
+        <div className="glass" style={{ padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem' }}>All Platform Orders</h3>
+          {orders.length === 0 ? (
+            <p className="text-muted">No orders found.</p>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--glass-border)' }}>
+                    {['Order ID', 'User ID', 'Total Price', 'Status', 'Date'].map((h) => (
+                      <th key={h} style={{ padding: '1rem', color: 'var(--text-muted)', fontWeight: '500' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => (
+                    <tr key={order.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <td style={{ padding: '1rem' }}>#{order.id}</td>
+                      <td style={{ padding: '1rem' }}>{order.userId}</td>
+                      <td style={{ padding: '1rem', fontWeight: '600', color: 'var(--accent-primary)' }}>${order.totalPrice}</td>
+                      <td style={{ padding: '1rem' }}>
+                        <span
+                          style={{
+                            padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.85rem',
+                            background: order.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(245, 158, 11, 0.1)',
+                            color: order.status === 'COMPLETED' ? '#10b981' : '#f59e0b',
+                          }}
+                        >
+                          {order.status}
+                        </span>
+                      </td>
+                      <td style={{ padding: '1rem', color: 'var(--text-muted)' }}>
+                        {new Date(order.createdAt).toLocaleString()}
                       </td>
                     </tr>
                   ))}

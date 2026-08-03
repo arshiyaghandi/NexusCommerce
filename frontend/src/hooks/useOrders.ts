@@ -19,3 +19,11 @@ export function usePlaceOrder() {
     },
   });
 }
+
+export function useAdminOrders() {
+  return useQuery({
+    queryKey: ['admin', 'orders'],
+    queryFn: () => import('../api/orders').then(m => m.getAllOrders()),
+    refetchInterval: 10000,
+  });
+}

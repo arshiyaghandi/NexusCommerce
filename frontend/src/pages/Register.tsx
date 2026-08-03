@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserPlus, ArrowRight, Lock, User, Mail, UserCircle, Eye, EyeOff, CheckCircle2, XCircle } from 'lucide-react';
 import { register } from '../api/auth';
 import { useToast } from '../contexts/ToastContext';
-import { executeRecaptcha } from '../utils/recaptcha';
+import MathCaptcha from '../components/MathCaptcha';
 
 const inputStyle = {
   width: '100%',
@@ -100,11 +100,18 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [captchaId, setCaptchaId] = useState('');
+  const [captchaAnswer, setCaptchaAnswer] = useState('');
   const navigate = useNavigate();
   const { addToast } = useToast();
 
   const handleChange = (field: keyof FormFields) => (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+  };
+
+  const handleCaptchaVerify = (id: string, answer: string) => {
+    setCaptchaId(id);
+    setCaptchaAnswer(answer);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -122,17 +129,21 @@ export default function Register() {
       addToast('Username is required', 'error');
       return;
     }
+    if (!captchaId || !captchaAnswer) {
+      addToast('Please complete the captcha', 'error');
+      return;
+    }
 
     setIsLoading(true);
     try {
-      const recaptchaToken = await executeRecaptcha('register');
       await register({
         username: formData.username,
         password: formData.password,
         email: formData.email || undefined,
         firstName: formData.firstName || undefined,
         lastName: formData.lastName || undefined,
-        recaptchaToken,
+        captchaId,
+        captchaAnswer,
       });
       addToast('Registration successful! Redirecting to login...', 'success');
       setTimeout(() => navigate('/login'), 2000);
@@ -260,6 +271,8 @@ export default function Register() {
               </p>
             )}
           </div>
+
+          <MathCaptcha onVerify={handleCaptchaVerify} />
 
           <button
             type="submit"

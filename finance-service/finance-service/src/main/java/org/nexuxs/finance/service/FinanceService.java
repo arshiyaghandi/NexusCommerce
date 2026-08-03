@@ -94,6 +94,19 @@ public class FinanceService {
                         .map(tuple -> new FinanceSummaryResponse(userId, tuple.getT1(), tuple.getT2())));
     }
 
+    public Flux<Transaction> getPlatformTransactions() {
+        return transactionRepository.findAllByOrderByCreatedAtDesc();
+    }
+
+    public Mono<FinanceSummaryResponse> getPlatformSummary() {
+        return transactionRepository.findAll()
+                .map(Transaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add)
+                .zipWith(transactionRepository.count())
+                .map(tuple -> new FinanceSummaryResponse("ADMIN_PLATFORM", tuple.getT1(), tuple.getT2()))
+                .defaultIfEmpty(new FinanceSummaryResponse("ADMIN_PLATFORM", BigDecimal.ZERO, 0L));
+    }
+
     private Mono<String> currentUserId() {
         return ReactiveSecurityContextHolder.getContext()
                 .map(context -> context.getAuthentication())

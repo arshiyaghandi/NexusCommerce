@@ -113,7 +113,6 @@ public class InventoryService {
                     log.error("Reservation failed for orderId={}, publishing InventoryFailedEvent: {}",
                             event.orderId(), reason);
 
-                    // Release stock for any lines that were already reserved before the failure
                     return Flux.fromIterable(reserved)
                             .flatMap(rl -> releaseStock(toProductId(rl.skuCode()), rl.quantity()))
                             .then(Mono.defer(() -> {

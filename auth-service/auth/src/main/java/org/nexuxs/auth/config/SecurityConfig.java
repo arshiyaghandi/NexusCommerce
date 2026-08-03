@@ -23,6 +23,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/api/auth/register").permitAll()
+                        .pathMatchers("/api/auth/captcha").permitAll()
                         .pathMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                         .anyExchange().authenticated()
                 )

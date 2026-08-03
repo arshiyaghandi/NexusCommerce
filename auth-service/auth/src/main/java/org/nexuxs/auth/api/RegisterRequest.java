@@ -6,7 +6,8 @@ public class RegisterRequest {
     private String email;
     private String firstName;
     private String lastName;
-    private String recaptchaToken;
+    private String captchaId;
+    private String captchaAnswer;
 
     public String getUsername() { return username; }
     public void setUsername(String username) { this.username = username; }
@@ -23,6 +24,9 @@ public class RegisterRequest {
     public String getLastName() { return lastName; }
     public void setLastName(String lastName) { this.lastName = lastName; }
 
-    public String getRecaptchaToken() { return recaptchaToken; }
-    public void setRecaptchaToken(String recaptchaToken) { this.recaptchaToken = recaptchaToken; }
+    public String getCaptchaId() { return captchaId; }
+    public void setCaptchaId(String captchaId) { this.captchaId = captchaId; }
+
+    public String getCaptchaAnswer() { return captchaAnswer; }
+    public void setCaptchaAnswer(String captchaAnswer) { this.captchaAnswer = captchaAnswer; }
 }

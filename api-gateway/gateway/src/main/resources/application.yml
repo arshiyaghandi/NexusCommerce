@@ -64,6 +64,10 @@ spring:
           uri: lb://auth-service
           predicates:
             - Path=/api/auth/**
+        - id: recommendation-service
+          uri: lb://recommendation-service
+          predicates:
+            - Path=/api/recommendations/**
   security:
     oauth2:
       resourceserver:
