@@ -37,6 +37,9 @@
         <java.version>21</java.version>
         <spring-cloud.version>2023.0.1</spring-cloud.version>
         <messaging-contracts.version>1.0.0-SNAPSHOT</messaging-contracts.version>
+        <springdoc.version>2.5.0</springdoc.version>
+        <logstash-encoder.version>7.4</logstash-encoder.version>
+        <micrometer.version>1.12.5</micrometer.version>
     </properties>
 
     <dependencyManagement>
@@ -52,6 +55,30 @@
                 <groupId>org.nexuxs</groupId>
                 <artifactId>messaging-contracts</artifactId>
                 <version>${messaging-contracts.version}</version>
+            </dependency>
+            <!-- Metrics: Micrometer Prometheus registry -->
+            <dependency>
+                <groupId>io.micrometer</groupId>
+                <artifactId>micrometer-registry-prometheus</artifactId>
+                <version>${micrometer.version}</version>
+            </dependency>
+            <!-- Logging: Logstash Logback Encoder -->
+            <dependency>
+                <groupId>net.logstash.logback</groupId>
+                <artifactId>logstash-logback-encoder</artifactId>
+                <version>${logstash-encoder.version}</version>
+            </dependency>
+            <!-- API Docs: SpringDoc OpenAPI for WebFlux services -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webflux-ui</artifactId>
+                <version>${springdoc.version}</version>
+            </dependency>
+            <!-- API Docs: SpringDoc OpenAPI for WebMVC services -->
+            <dependency>
+                <groupId>org.springdoc</groupId>
+                <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+                <version>${springdoc.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>
