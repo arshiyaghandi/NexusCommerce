@@ -41,11 +41,17 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/*/v3/api-docs"
                         ).permitAll()
+                        // Products & Categories: public reads
                         .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll()
+                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**").permitAll()
                         .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/inventory/**").permitAll()
+                        // Admin-only writes for products and categories
                         .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
                         .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
                         .pathMatchers(org.springframework.http.HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
+                        .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
+                        .pathMatchers(org.springframework.http.HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
                         .pathMatchers("/api/finance/**").hasRole("ADMIN")
                         .anyExchange().authenticated()
                 )

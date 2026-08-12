@@ -17,8 +17,10 @@ public class ProductAPI {
     private final ProductService productService;
 
     @GetMapping
-    public Flux<ProductResponse> findAll(@RequestParam(required = false) String search) {
-        return productService.findAll(search);
+    public Flux<ProductResponse> findAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long categoryId) {
+        return productService.findAll(search, categoryId);
     }
 
     @GetMapping("/{id}")

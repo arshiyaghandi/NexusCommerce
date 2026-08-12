@@ -6,5 +6,7 @@ public record ProductRequest(
         String skuCode,
         String name,
         String description,
-        BigDecimal price
+        BigDecimal price,
+        Long categoryId    // optional — null means uncategorized
 ) {}
+

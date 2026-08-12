@@ -1,9 +1,12 @@
 import api from './client';
 import type { Product, ProductRequest } from '../types';
 
-export async function getProducts(search?: string): Promise<Product[]> {
+export async function getProducts(search?: string, categoryId?: number): Promise<Product[]> {
   const response = await api.get<Product[]>('/products', {
-    params: search ? { search } : undefined,
+    params: {
+      ...(search ? { search } : {}),
+      ...(categoryId != null ? { categoryId } : {}),
+    },
   });
   return response.data;
 }

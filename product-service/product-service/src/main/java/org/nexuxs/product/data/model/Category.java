@@ -8,23 +8,20 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-import java.math.BigDecimal;
-
-@Table("t_product")
+@Table("t_category")
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class Product {
+public class Category {
 
     @Id
     private Long id;
-    private String skuCode;
+
     private String name;
+
     private String description;
-    private BigDecimal price;
 
-    @Column("category_id")
-    private Long categoryId;
+    @Column("parent_id")
+    private Long parentId;
 }
-
