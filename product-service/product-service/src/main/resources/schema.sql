@@ -1,8 +1,8 @@
 CREATE TABLE IF NOT EXISTS t_category (
-    id         BIGSERIAL PRIMARY KEY,
-    name       VARCHAR(255) NOT NULL,
+    id          BIGSERIAL PRIMARY KEY,
+    name        VARCHAR(255) NOT NULL,
     description TEXT,
-    parent_id  BIGINT REFERENCES t_category(id) ON DELETE SET NULL
+    parent_id   BIGINT REFERENCES t_category(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS t_product (
@@ -13,6 +13,9 @@ CREATE TABLE IF NOT EXISTS t_product (
     price       DECIMAL(19, 2) NOT NULL,
     category_id BIGINT REFERENCES t_category(id) ON DELETE SET NULL
 );
+
+-- Migration safety for existing tables
+ALTER TABLE t_product ADD COLUMN IF NOT EXISTS category_id BIGINT REFERENCES t_category(id) ON DELETE SET NULL;
 
 -- Seed categories
 INSERT INTO t_category (id, name, description, parent_id)
@@ -28,7 +31,7 @@ VALUES
 ON CONFLICT DO NOTHING;
 
 -- Re-sync sequence after manual inserts
-SELECT setval('t_category_id_seq', (SELECT MAX(id) FROM t_category));
+SELECT setval('t_category_id_seq', (SELECT COALESCE(MAX(id), 1) FROM t_category));
 
 -- Seed products with categories
 INSERT INTO t_product (sku_code, name, description, price, category_id)
