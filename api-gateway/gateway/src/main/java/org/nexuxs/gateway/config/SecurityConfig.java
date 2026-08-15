@@ -3,7 +3,9 @@ package org.nexuxs.gateway.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.reactive.EnableWebFluxSecurity;
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.core.GrantedAuthority;
@@ -28,9 +30,9 @@ public class SecurityConfig {
     public SecurityWebFilterChain springSecurityFilterChain(ServerHttpSecurity http) {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .cors(org.springframework.security.config.Customizer.withDefaults())
+                .cors(Customizer.withDefaults())
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers(org.springframework.http.HttpMethod.OPTIONS).permitAll()
+                        .pathMatchers(HttpMethod.OPTIONS).permitAll()
                         .pathMatchers("/actuator/**", "/ws/**", "/api/auth/**").permitAll()
                         // Swagger UI & API docs (aggregated from all services)
                         .pathMatchers(
@@ -42,16 +44,16 @@ public class SecurityConfig {
                                 "/*/v3/api-docs"
                         ).permitAll()
                         // Products & Categories: public reads
-                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/products/**").permitAll()
-                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/categories/**").permitAll()
-                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/inventory/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/categories/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/inventory/**").permitAll()
                         // Admin-only writes for products and categories
-                        .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
-                        .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
-                        .pathMatchers(org.springframework.http.HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
-                        .pathMatchers(org.springframework.http.HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
-                        .pathMatchers(org.springframework.http.HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
-                        .pathMatchers(org.springframework.http.HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PUT, "/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/products/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.POST, "/api/categories/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.PUT, "/api/categories/**").hasRole("ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/categories/**").hasRole("ADMIN")
                         .pathMatchers("/api/finance/**").hasRole("ADMIN")
                         .anyExchange().authenticated()
                 )
