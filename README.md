@@ -46,6 +46,63 @@ NexusCommerce follows a **reactive microservices** architecture. All backend ser
 | **finance-service** | 8089 | Transaction ledger |
 | **messaging-service** | 8084 | Kafka event broker + shared contracts |
 
+## API Reference
+
+All requests can be routed directly through the **API Gateway** (`http://localhost:8080`) or accessed via individual service ports.
+
+### Authentication & User Service (`/api/auth`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/auth/register` | Public | Register a new user with Keycloak |
+| `POST` | `/api/auth/login` | Public | Authenticate user and retrieve JWT tokens |
+| `GET` | `/api/auth/captcha` | Public | Generate math captcha challenge for spam prevention |
+| `GET` | `/api/auth/user` | User | Get profile details for authenticated user |
+
+### Product Catalog (`/api/products`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/products` | Public | List products (supports `?search=` and `?categoryId=`) |
+| `GET` | `/api/products/{id}` | Public | Retrieve product details by ID |
+| `POST` | `/api/products` | Admin | Create a new product |
+| `PUT` | `/api/products/{id}` | Admin | Update product information |
+| `DELETE` | `/api/products/{id}` | Admin | Remove product from catalog |
+| `GET` | `/api/products/categories` | Public | List hierarchical categories and subcategories |
+
+### Inventory Service (`/api/inventory`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/inventory/{skuCode}` | Public | Check available stock quantity for a SKU |
+| `POST` | `/api/inventory/reserve` | Internal | Reserve stock for an active order (Saga step) |
+| `POST` | `/api/inventory/release` | Internal | Release reserved stock on compensation/failure |
+
+### Shopping Cart (`/api/cart`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/cart` | User | Fetch the current user's Redis-backed shopping cart |
+| `POST` | `/api/cart/items` | User | Add or update quantity for an item in the cart |
+| `DELETE` | `/api/cart/items/{productId}` | User | Remove a specific item from the cart |
+| `DELETE` | `/api/cart` | User | Clear entire shopping cart |
+
+### Order Management (`/api/orders`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `POST` | `/api/orders` | User | Place a new order and trigger the Kafka Saga flow |
+| `GET` | `/api/orders` | User | Retrieve list of orders placed by authenticated user |
+| `GET` | `/api/orders/{id}` | User | Get detailed order status and lifecycle history |
+
+### Finance & Transactions (`/api/finance`)
+| Method | Endpoint | Auth | Description |
+|--------|----------|------|-------------|
+| `GET` | `/api/finance/transactions` | Admin | View transaction records and audit ledger |
+| `GET` | `/api/finance/summary` | Admin | Aggregate financial analytics and revenue reports |
+
+### Real-Time Notifications (`/ws`)
+| Protocol | Endpoint | Auth | Description |
+|----------|----------|------|-------------|
+| `WS` | `/ws/notifications` | User | WebSocket connection for real-time order status events |
+
+---
+
 ## Order Fulfillment Saga
 
 The platform uses a **choreography-based Saga** (no central orchestrator). Each service reacts to events and emits the next:
