@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Slf4j
 @Component
 @Profile("!test")
@@ -26,16 +28,18 @@ public class OrderCreatedNotificationConsumer {
             containerFactory = "orderCreatedListenerFactory"
     )
     public void consume(OrderCreatedEvent event) {
-        broadcast(NexusTopics.ORDER_CREATED, event);
-    }
-
-    private void broadcast(String topic, Object event) {
         try {
-            String payload = objectMapper.writeValueAsString(event);
-            log.info("[notification] broadcasting {} event", topic);
-            notificationHub.broadcast(payload);
+            Map<String, Object> notification = Map.of(
+                    "type", "ORDER_CREATED",
+                    "orderId", event.orderId(),
+                    "status", "PENDING",
+                    "message", "Your order #" + event.orderId() + " has been placed successfully"
+            );
+            String payload = objectMapper.writeValueAsString(notification);
+            log.info("[notification] sending ORDER_CREATED to userId={}", event.userId());
+            notificationHub.sendToUser(event.userId(), payload);
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize event from topic {}", topic, e);
+            log.error("Failed to serialize ORDER_CREATED event", e);
         }
     }
 }
