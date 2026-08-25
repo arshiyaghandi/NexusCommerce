@@ -32,13 +32,12 @@ public class OrderCreatedEventConsumer {
         log.info("[inventory] order.created | orderId={} userId={} items={}",
                 event.orderId(), event.userId(), event.items().size());
 
-        inventoryService.handleOrderCreated(event)
-                .subscribe(
-                        null,
-                        error -> {
-                            log.error("[inventory] failed to handle order.created for orderId={}",
-                                    event.orderId(), error);
-                        }
-                );
+        try {
+            inventoryService.handleOrderCreated(event).block();
+        } catch (Exception e) {
+            log.error("[inventory] failed to handle order.created for orderId={}",
+                    event.orderId(), e);
+            throw e;
+        }
     }
 }

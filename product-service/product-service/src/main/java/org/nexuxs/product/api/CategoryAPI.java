@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.nexuxs.product.data.dto.CategoryRequest;
 import org.nexuxs.product.data.dto.CategoryResponse;
 import org.nexuxs.product.service.CategoryService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -31,7 +32,7 @@ public class CategoryAPI {
     /** ADMIN: create a new category. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Mono<CategoryResponse> createCategory(@RequestBody CategoryRequest request) {
+    public Mono<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
         return categoryService.createCategory(request);
     }
 
@@ -39,7 +40,7 @@ public class CategoryAPI {
     @PutMapping("/{id}")
     public Mono<CategoryResponse> updateCategory(
             @PathVariable Long id,
-            @RequestBody CategoryRequest request) {
+            @Valid @RequestBody CategoryRequest request) {
         return categoryService.updateCategory(id, request);
     }
 

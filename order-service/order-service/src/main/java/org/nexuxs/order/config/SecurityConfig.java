@@ -16,6 +16,7 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
                         .pathMatchers("/actuator/**", "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**").permitAll()
+                        .pathMatchers("/api/orders/all").hasAuthority("ROLE_ADMIN")
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));

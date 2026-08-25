@@ -40,6 +40,7 @@ public class PaymentService {
                 event.orderId(), event.userId(), event.totalPrice());
 
         boolean hasSufficientFunds = event.totalPrice() != null
+                && event.totalPrice().compareTo(BigDecimal.ZERO) > 0
                 && event.totalPrice().compareTo(declineAbove) <= 0;
 
         if (hasSufficientFunds) {
@@ -55,7 +56,14 @@ public class PaymentService {
                     .then();
         } else {
             log.warn("Payment failed for Order: {}. Insufficient funds.", event.orderId());
-            return publishFailure(event, "INSUFFICIENT_FUNDS");
+            Payment failedPayment = Payment.builder()
+                    .orderId(event.orderId())
+                    .userId(event.userId())
+                    .amount(event.totalPrice())
+                    .status(PaymentStatus.FAILED)
+                    .build();
+            return paymentRepository.save(failedPayment)
+                    .then(publishFailure(event, "INSUFFICIENT_FUNDS"));
         }
     }
 

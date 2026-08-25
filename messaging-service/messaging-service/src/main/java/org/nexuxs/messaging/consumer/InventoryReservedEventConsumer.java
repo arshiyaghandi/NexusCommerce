@@ -10,7 +10,10 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @Component
 @Profile("!test")
-public class InventoryReservedEventConsumer {
+public class
+
+
+InventoryReservedEventConsumer {
 
     @KafkaListener(
             topics = NexusTopics.INVENTORY_RESERVED,

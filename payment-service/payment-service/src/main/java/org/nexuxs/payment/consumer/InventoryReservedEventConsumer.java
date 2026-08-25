@@ -32,10 +32,11 @@ public class InventoryReservedEventConsumer {
         log.info("[payment] inventory.reserved | orderId={} user={} amount={}",
                 event.orderId(), event.userId(), event.totalPrice());
 
-        paymentService.processPayment(event).subscribe(
-                null,
-                error -> log.error("[payment] failed to process payment for orderId={}",
-                        event.orderId(), error)
-        );
+        try {
+            paymentService.processPayment(event).block();
+        } catch (Exception e) {
+            log.error("[payment] failed to process payment for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

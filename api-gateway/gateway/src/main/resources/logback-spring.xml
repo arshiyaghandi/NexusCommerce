@@ -2,7 +2,6 @@
 <configuration>
     <springProperty scope="context" name="appName" source="spring.application.name" defaultValue="api-gateway"/>
 
-    <!-- Console Appender -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
         <encoder class="net.logstash.logback.encoder.LoggingEventCompositeJsonEncoder">
             <providers>

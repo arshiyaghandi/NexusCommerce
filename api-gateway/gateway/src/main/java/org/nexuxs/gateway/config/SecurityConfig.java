@@ -18,7 +18,6 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(Customizer.withDefaults())
                 .authorizeExchange(exchanges -> exchanges
-                        // Allow everything for easy local development & Swagger testing
                         .anyExchange().permitAll()
                 );
         return http.build();

@@ -31,7 +31,7 @@ public class OrderEventPublisher {
                         line.getQuantity(),
                         line.getUnitPrice()))
                 .collectList()
-                .flatMap(items -> Mono.fromRunnable(() -> {
+                .flatMap(items -> {
                     Long productId = items.isEmpty() ? null : items.get(0).productId();
                     int quantity = items.stream().mapToInt(OrderLineRecord::quantity).sum();
                     OrderCreatedEvent event = new OrderCreatedEvent(
@@ -45,10 +45,12 @@ public class OrderEventPublisher {
                             Instant.now()
                     );
                     String key = order.getId() != null ? order.getId().toString() : order.getUserId();
-                    kafkaTemplate.send(NexusTopics.ORDER_CREATED, key, event);
-                    log.info("Published {} for orderId={} with {} items",
-                            NexusTopics.ORDER_CREATED, order.getId(), items.size());
-                }))
+                    return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.ORDER_CREATED, key, event).toCompletableFuture())
+                            .doOnSuccess(result -> log.info("Published {} for orderId={} with {} items",
+                                    NexusTopics.ORDER_CREATED, order.getId(), items.size()))
+                            .doOnError(error -> log.error("Failed to publish {} for orderId={}",
+                                    NexusTopics.ORDER_CREATED, order.getId(), error));
+                })
                 .subscribeOn(Schedulers.boundedElastic())
                 .then();
     }

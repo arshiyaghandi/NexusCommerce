@@ -17,20 +17,20 @@ import reactor.core.scheduler.Schedulers;
 @ConditionalOnProperty(prefix = "nexus.kafka", name = "enabled", havingValue = "true", matchIfMissing = true)
 public class InventoryEventPublisher {
 
-    // نوع داده به Object تغییر کرده تا هر دو کلاس رویداد را پشتیبانی کند
+    // Generic Object type to support both event classes
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public Mono<Void> publishReservedEvent(InventoryReservedEvent event) {
-        return Mono.fromRunnable(() -> {
-            kafkaTemplate.send(NexusTopics.INVENTORY_RESERVED, String.valueOf(event.orderId()), event);
-            log.info("Published {} for orderId {}", NexusTopics.INVENTORY_RESERVED, event.orderId());
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.INVENTORY_RESERVED, String.valueOf(event.orderId()), event).toCompletableFuture())
+                .doOnSuccess(result -> log.info("Published {} for orderId {}", NexusTopics.INVENTORY_RESERVED, event.orderId()))
+                .doOnError(error -> log.error("Failed to publish {} for orderId {}", NexusTopics.INVENTORY_RESERVED, event.orderId(), error))
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     public Mono<Void> publishFailedEvent(InventoryFailedEvent event) {
-        return Mono.fromRunnable(() -> {
-            kafkaTemplate.send(NexusTopics.INVENTORY_FAILED, String.valueOf(event.orderId()), event);
-            log.error("Published {} for orderId {} due to: {}", NexusTopics.INVENTORY_FAILED, event.orderId(), event.reason());
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.INVENTORY_FAILED, String.valueOf(event.orderId()), event).toCompletableFuture())
+                .doOnSuccess(result -> log.warn("Published {} for orderId {} due to: {}", NexusTopics.INVENTORY_FAILED, event.orderId(), event.reason()))
+                .doOnError(error -> log.error("Failed to publish {} for orderId {}", NexusTopics.INVENTORY_FAILED, event.orderId(), error))
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 }

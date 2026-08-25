@@ -54,7 +54,7 @@ public class AuthController {
                     .build();
             response.addCookie(cookie);
         }
-        response.setStatusCode(HttpStatus.FOUND);
+        response.setStatusCode(HttpStatus.FOUND); /*status 302 redirect to front */
         response.getHeaders().setLocation(URI.create("http://localhost:3000"));
         return response.setComplete();
     }
@@ -69,7 +69,7 @@ public class AuthController {
         return redisTemplate.opsForValue().get(cacheKey)
                 .flatMap(json -> {
                     try {
-                        @SuppressWarnings("unchecked")
+                         @SuppressWarnings("unchecked")
                         Map<String, Object> cached = objectMapper.readValue(json, Map.class);
                         return Mono.just(cached);
                     } catch (Exception e) {

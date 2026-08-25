@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.messaging.contracts.NexusTopics;
 import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
 import org.nexuxs.order.service.OrderService;
+import org.nexuxs.order.data.model.Order;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -33,12 +34,14 @@ public class PaymentCompletedEventConsumer {
         log.info("[order] payment.completed | orderId={} paymentId={} status={} succeeded={}",
                 event.orderId(), event.paymentId(), event.status(), paymentSucceeded);
 
-        orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded)
-                .subscribe(
-                        order -> log.info("[order] saga applied | orderId={} -> {}",
-                                order.getId(), order.getStatus()),
-                        error -> log.error("[order] failed to apply payment outcome for orderId={}",
-                                event.orderId(), error)
-                );
+        try {
+            Order order = orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded).block();
+            if (order != null) {
+                log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
+            }
+        } catch (Exception e) {
+            log.error("[order] failed to apply payment outcome for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

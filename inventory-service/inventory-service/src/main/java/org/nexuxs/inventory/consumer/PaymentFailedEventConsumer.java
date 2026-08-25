@@ -19,7 +19,9 @@ import reactor.core.publisher.Flux;
 @Component
 @Profile("!test")
 @RequiredArgsConstructor
-public class PaymentFailedEventConsumer {
+public class
+
+PaymentFailedEventConsumer {
 
     private final InventoryService inventoryService;
 
@@ -37,13 +39,15 @@ public class PaymentFailedEventConsumer {
             return;
         }
 
-        Flux.fromIterable(event.items())
-                .flatMap(item -> inventoryService.compensateReservation(
-                        event.orderId(), item.productId(), item.quantity()))
-                .subscribe(
-                        null,
-                        error -> log.error("[inventory] failed to compensate reservation for orderId={}",
-                                event.orderId(), error)
-                );
+        try {
+            Flux.fromIterable(event.items())
+                    .flatMap(item -> inventoryService.compensateReservation(
+                            event.orderId(), item.productId(), item.quantity()))
+                    .collectList()
+                    .block();
+        } catch (Exception e) {
+            log.error("[inventory] failed to compensate reservation for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

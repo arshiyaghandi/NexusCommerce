@@ -31,6 +31,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Service
 @RequiredArgsConstructor
@@ -82,7 +83,7 @@ public class InventoryService {
      * and publishes InventoryFailedEvent so the order-service can reject the order.
      */
     public Mono<Void> handleOrderCreated(OrderCreatedEvent event) {
-        List<ReservedLine> reserved = new ArrayList<>();
+        List<ReservedLine> reserved = new CopyOnWriteArrayList<>();
 
         return Flux.fromIterable(event.items())
                 .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line)
@@ -152,12 +153,12 @@ public class InventoryService {
 
     public Mono<Void> releaseStock(Long productId, int quantity) {
         String skuCode = toSkuCode(productId);
-        return inventoryRepository.findBySkuCode(skuCode)
-                .flatMap(item -> {
-                    item.setQuantity(item.getQuantity() + quantity);
-                    return inventoryRepository.save(item)
-                            .doOnSuccess(saved -> log.info("Compensating action: Released {} units of {} back to inventory.", quantity, skuCode));
-                })
+        return inventoryRepository.incrementStock(skuCode, quantity)
+                .doOnSuccess(saved -> log.info("Compensating action: Released {} units of {} back to inventory.", quantity, skuCode))
+                .switchIfEmpty(Mono.defer(() -> {
+                    log.warn("SKU {} not found during stock release for productId={}", skuCode, productId);
+                    return Mono.empty();
+                }))
                 .then(invalidateCache(skuCode));
     }
 
