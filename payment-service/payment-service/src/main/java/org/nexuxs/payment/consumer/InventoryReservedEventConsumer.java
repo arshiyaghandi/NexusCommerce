@@ -33,7 +33,7 @@ public class InventoryReservedEventConsumer {
                 event.orderId(), event.userId(), event.totalPrice());
 
         try {
-            paymentService.processPayment(event).block();
+            paymentService.processPayment(event).block(java.time.Duration.ofSeconds(30));
         } catch (Exception e) {
             log.error("[payment] failed to process payment for orderId={}", event.orderId(), e);
             throw e;

@@ -57,7 +57,7 @@ public class InventoryService {
                         return Mono.error(new IllegalStateException("Failed to deserialize cached inventory", e));
                     }
                 })
-                .switchIfEmpty(inventoryRepository.findBySkuCode(skuCode)
+                        .switchIfEmpty(inventoryRepository.findBySkuCode(skuCode)
                         .map(item -> new InventoryResponse(item.getSkuCode(), item.getQuantity()))
                         .flatMap(response -> {
                             try {
@@ -68,12 +68,19 @@ public class InventoryService {
                                 return Mono.just(response);
                             }
                         }))
+                .onErrorResume(e -> inventoryRepository.findBySkuCode(skuCode)
+                        .map(item -> new InventoryResponse(item.getSkuCode(), item.getQuantity())))
                 .switchIfEmpty(Mono.error(new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "SKU not found: " + skuCode)));
     }
 
     private Mono<Void> invalidateCache(String skuCode) {
-        return redisTemplate.delete(CACHE_KEY_PREFIX + skuCode).then();
+        return redisTemplate.delete(CACHE_KEY_PREFIX + skuCode)
+                .onErrorResume(e -> {
+                    log.warn("Cache invalidation failed for {}", skuCode, e);
+                    return Mono.empty();
+                })
+                .then();
     }
 
     /**
@@ -86,12 +93,12 @@ public class InventoryService {
         List<ReservedLine> reserved = new CopyOnWriteArrayList<>();
 
         return Flux.fromIterable(event.items())
-                .flatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line)
+                .concatMap(line -> reserveLine(event.orderId(), event.userId(), event.totalPrice(), line)
                         .doOnNext(reserved::add))
                 .collectList()
                 .flatMap(reservedLines -> {
                     InventoryEventPublisher publisher = publisherProvider.getIfAvailable();
-                    if (publisher == null) return Mono.empty();
+                    if (publisher == null || reservedLines.isEmpty()) return Mono.empty();
 
                     List<ReservedLineRecord> items = reservedLines.stream()
                             .map(rl -> new ReservedLineRecord(null, rl.skuCode(), rl.quantity(), rl.remainingQuantity()))
@@ -193,8 +200,8 @@ public class InventoryService {
 
                     log.warn("Stock release failed for orderId={}, productId={}, removing idempotency marker for retry: {}",
                             orderId, productId, error.getMessage());
-                    Query deleteQuery = Query.query(Criteria.where("orderId").is(orderId)
-                            .and("productId").is(productId));
+                    Query deleteQuery = Query.query(Criteria.where("order_id").is(orderId)
+                            .and("product_id").is(productId));
                     return entityTemplate.delete(ProcessedCompensation.class)
                             .matching(deleteQuery)
                             .all()

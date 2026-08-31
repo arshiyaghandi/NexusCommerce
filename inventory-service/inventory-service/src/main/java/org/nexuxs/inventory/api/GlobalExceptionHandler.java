@@ -36,8 +36,12 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(IllegalStateException.class)
     public Mono<ResponseEntity<Map<String, Object>>> handleIllegalState(IllegalStateException ex) {
-        return Mono.just(ResponseEntity.badRequest()
-                .body(buildBody(HttpStatus.BAD_REQUEST.value(), ex.getMessage())));
+        if (ex.getMessage() != null && ex.getMessage().contains("INSUFFICIENT_STOCK")) {
+            return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(buildBody(HttpStatus.CONFLICT.value(), ex.getMessage())));
+        }
+        return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(buildBody(HttpStatus.INTERNAL_SERVER_ERROR.value(), ex.getMessage())));
     }
 
     @ExceptionHandler(Exception.class)

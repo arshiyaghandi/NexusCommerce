@@ -8,7 +8,7 @@ import lombok.Setter;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Table;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 
 /**
  * Idempotency ledger row marking that the Saga compensation for an order+product has
@@ -25,9 +25,11 @@ import java.time.LocalDateTime;
 public class ProcessedCompensation {
 
     @Id
+    private Long id;
+    
     private Long orderId;
 
     private Long productId;
 
-    private LocalDateTime processedAt;
+    private Instant processedAt;
 }

@@ -32,20 +32,18 @@ public class OrderEventPublisher {
                         line.getUnitPrice()))
                 .collectList()
                 .flatMap(items -> {
-                    Long productId = items.isEmpty() ? null : items.get(0).productId();
-                    int quantity = items.stream().mapToInt(OrderLineRecord::quantity).sum();
                     OrderCreatedEvent event = new OrderCreatedEvent(
                             order.getId(),
                             order.getUserId(),
-                            productId,
-                            quantity,
+                            null,
+                            items.stream().mapToInt(OrderLineRecord::quantity).sum(),
                             items,
                             order.getTotalPrice(),
                             order.getStatus().name(),
                             Instant.now()
                     );
                     String key = order.getId() != null ? order.getId().toString() : order.getUserId();
-                    return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.ORDER_CREATED, key, event).toCompletableFuture())
+                    return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.ORDER_CREATED, key, event))
                             .doOnSuccess(result -> log.info("Published {} for orderId={} with {} items",
                                     NexusTopics.ORDER_CREATED, order.getId(), items.size()))
                             .doOnError(error -> log.error("Failed to publish {} for orderId={}",

@@ -10,6 +10,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 /**
  * Saga listener: closes the order lifecycle by reacting to payment outcomes.
  * A {@code COMPLETED} payment completes the order; anything else cancels it.
@@ -35,7 +37,7 @@ public class PaymentCompletedEventConsumer {
                 event.orderId(), event.paymentId(), event.status(), paymentSucceeded);
 
         try {
-            Order order = orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded).block();
+            Order order = orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded).block(Duration.ofSeconds(30));
             if (order != null) {
                 log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
             }

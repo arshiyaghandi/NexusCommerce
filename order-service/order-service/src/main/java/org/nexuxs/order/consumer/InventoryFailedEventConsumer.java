@@ -33,7 +33,7 @@ public class InventoryFailedEventConsumer {
                 event.orderId(), event.skuCode(), event.reason());
 
         try {
-            Order order = orderService.applyInventoryFailure(event.orderId()).block();
+            Order order = orderService.applyInventoryFailure(event.orderId()).block(java.time.Duration.ofSeconds(30));
             if (order != null) {
                 log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
             }

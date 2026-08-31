@@ -33,7 +33,7 @@ public class OrderPaymentFailedEventConsumer {
                 event.orderId(), event.productId(), event.quantity(), event.reason());
 
         try {
-            Order order = orderService.applyPaymentOutcome(event.orderId(), false).block();
+            Order order = orderService.applyPaymentOutcome(event.orderId(), false).block(java.time.Duration.ofSeconds(30));
             if (order != null) {
                 log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
             }

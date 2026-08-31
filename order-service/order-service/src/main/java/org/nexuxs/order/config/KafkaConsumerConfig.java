@@ -12,8 +12,13 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.util.backoff.ExponentialBackOff;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
@@ -43,34 +48,41 @@ public class KafkaConsumerConfig {
     private String bootstrapServers;
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> paymentCompletedListenerFactory() {
-        return listenerFactory(PaymentCompletedEvent.class);
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> paymentCompletedListenerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        return listenerFactory(PaymentCompletedEvent.class, kafkaTemplate);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, InventoryFailedEvent> inventoryFailedListenerFactory() {
-        return listenerFactory(InventoryFailedEvent.class);
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryFailedEvent> inventoryFailedListenerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        return listenerFactory(InventoryFailedEvent.class, kafkaTemplate);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory() {
-        return listenerFactory(PaymentFailedEvent.class);
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        return listenerFactory(PaymentFailedEvent.class, kafkaTemplate);
     }
 
-    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType) {
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType, KafkaTemplate<String, Object> kafkaTemplate) {
         ConcurrentKafkaListenerContainerFactory<String, T> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(buildConsumerFactory(eventType));
+
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                new DeadLetterPublishingRecoverer(kafkaTemplate),
+                new ExponentialBackOff(1000L, 2.0)
+        );
+        factory.setCommonErrorHandler(errorHandler);
+
         return factory;
     }
 
     private <T> ConsumerFactory<String, T> buildConsumerFactory(Class<T> eventType) {
-        Map<String, Object> props = Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID,
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class
-        );
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventType, false);
         jsonDeserializer.addTrustedPackages(CONTRACTS_PACKAGE);
