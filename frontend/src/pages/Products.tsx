@@ -11,6 +11,7 @@ import PageTransition, { staggerItem, staggerContainer } from '../components/Pag
 import TiltCard from '../components/TiltCard';
 import MouseSpotlight from '../components/MouseSpotlight';
 import { ProductGridSkeleton } from '../components/Skeleton';
+import ProductVisual from '../components/ProductVisual';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -235,10 +236,7 @@ export default function Products() {
                         style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}
                       >
                         <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                          {/* Product image placeholder */}
-                          <div style={{ height: '140px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                            <div style={{ position: 'absolute', width: '90px', height: '90px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(28px)', opacity: 0.45 }} />
-                          </div>
+                          <ProductVisual name={product.name} category={product.categoryName} />
 
                           {/* Category badge */}
                           {product.categoryName && (

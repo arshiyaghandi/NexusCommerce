@@ -5,6 +5,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useCartCount } from '../hooks/useCart';
 import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
 import ScrollProgress from './ScrollProgress';
+import ParticleCanvas from './ParticleCanvas';
+import CustomCursor from './CustomCursor';
+import ClickSparkle from './ClickSparkle';
 
 export default function Layout() {
   const { user, logout } = useAuth();
@@ -24,6 +27,9 @@ export default function Layout() {
 
   return (
     <div className="container">
+      <ParticleCanvas />
+      <CustomCursor />
+      <ClickSparkle />
       <ScrollProgress />
       <motion.nav className="navbar glass" style={{ padding: navPadding, boxShadow: navShadow }}>
         <div className="nav-content container">

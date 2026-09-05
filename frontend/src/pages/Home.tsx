@@ -10,6 +10,9 @@ import PageTransition, { staggerItem, staggerContainer } from '../components/Pag
 import TiltCard from '../components/TiltCard';
 import MouseSpotlight from '../components/MouseSpotlight';
 import { ProductGridSkeleton } from '../components/Skeleton';
+import HeroTechCard from '../components/HeroTechCard';
+import CyberTicker from '../components/CyberTicker';
+import ProductVisual from '../components/ProductVisual';
 
 /* ── Animation variants ──────────────────────────────────────────── */
 const heroTextVariants = {
@@ -110,13 +113,11 @@ export default function Home() {
         className="glass"
         style={{
           position: 'relative',
-          padding: '6rem 4rem',
+          padding: '4.5rem 3.5rem',
           borderRadius: '24px',
           overflow: 'hidden',
-          marginBottom: '4rem',
-          minHeight: '500px',
-          display: 'flex',
-          alignItems: 'center',
+          marginBottom: '2.5rem',
+          minHeight: '520px',
         }}
         initial={{ opacity: 0, scale: 0.97 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -129,7 +130,7 @@ export default function Home() {
             backgroundImage: 'url(/hero-bg.jpg)',
             backgroundSize: 'cover',
             backgroundPosition: 'center',
-            opacity: 0.6,
+            opacity: 0.45,
             zIndex: 0,
           }}
         />
@@ -137,122 +138,168 @@ export default function Home() {
           style={{
             position: 'absolute',
             top: 0, left: 0, right: 0, bottom: 0,
-            background: 'linear-gradient(to right, rgba(2, 6, 23, 0.95) 0%, rgba(2, 6, 23, 0.4) 100%)',
+            background: 'linear-gradient(105deg, rgba(2, 6, 23, 0.98) 0%, rgba(15, 23, 42, 0.85) 50%, rgba(2, 6, 23, 0.7) 100%)',
             zIndex: 1,
           }}
         />
 
-        {/* Floating decorative orbs */}
+        {/* Floating decorative ambient light */}
         <motion.div
           style={{
-            position: 'absolute', top: '20%', right: '15%',
-            width: '120px', height: '120px',
-            background: 'var(--accent-gradient)', borderRadius: '50%',
-            filter: 'blur(50px)', opacity: 0.3, zIndex: 1,
+            position: 'absolute', top: '15%', left: '30%',
+            width: '200px', height: '200px',
+            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.25) 0%, transparent 70%)',
+            filter: 'blur(60px)', zIndex: 1,
           }}
           variants={floatingOrb}
           animate="animate"
         />
-        <motion.div
-          style={{
-            position: 'absolute', bottom: '10%', right: '30%',
-            width: '80px', height: '80px',
-            background: 'rgba(139, 92, 246, 0.5)', borderRadius: '50%',
-            filter: 'blur(40px)', opacity: 0.25, zIndex: 1,
-          }}
-          animate={{
-            y: [0, 12, 0],
-            scale: [1, 1.1, 1],
-            transition: { duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 },
-          }}
-        />
 
-        <div style={{ position: 'relative', zIndex: 2, maxWidth: '600px' }}>
-          <motion.h1
-            style={{ fontSize: '4rem', marginBottom: '1.5rem', lineHeight: '1.1' }}
-            variants={heroTextVariants}
-            initial="initial"
-            animate="animate"
-          >
-            Elevate Your <br />
-            <span className="text-gradient">Lifestyle</span>
-          </motion.h1>
-          <motion.p
-            style={{ fontSize: '1.25rem', color: '#cbd5e1', marginBottom: '2.5rem', lineHeight: '1.6' }}
-            variants={heroSubtitleVariants}
-            initial="initial"
-            animate="animate"
-          >
-            Discover a curated collection of premium products.
-            From cutting-edge electronics to luxury fashion,
-            find exactly what you need at NexusCommerce.
-          </motion.p>
-          <motion.div
-            style={{ display: 'flex', gap: '1rem' }}
-            variants={heroButtonVariants}
-            initial="initial"
-            animate="animate"
-          >
-            {user ? (
-              <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
-                <ShoppingBag size={20} /> Shop Now
+        <div
+          style={{
+            position: 'relative',
+            zIndex: 2,
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '3rem',
+            alignItems: 'center',
+          }}
+        >
+          {/* Left Column: Hero Copy & CTA */}
+          <div style={{ maxWidth: '580px' }}>
+            {/* High-Tech Cyber Badge */}
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                padding: '0.4rem 1rem',
+                borderRadius: '30px',
+                background: 'rgba(59, 130, 246, 0.12)',
+                border: '1px solid rgba(59, 130, 246, 0.35)',
+                boxShadow: '0 0 20px rgba(59, 130, 246, 0.2)',
+                marginBottom: '1.5rem',
+              }}
+            >
+              <span
+                style={{
+                  width: '8px',
+                  height: '8px',
+                  borderRadius: '50%',
+                  background: '#38bdf8',
+                  boxShadow: '0 0 10px #38bdf8',
+                }}
+              />
+              <span style={{ fontSize: '0.8rem', fontWeight: '700', letterSpacing: '1.2px', textTransform: 'uppercase', color: '#93c5fd' }}>
+                ⚡ NEXT-GEN REACTIVE COMMERCE
+              </span>
+            </motion.div>
+
+            <motion.h1
+              style={{ fontSize: '3.6rem', marginBottom: '1.25rem', lineHeight: '1.1', fontWeight: '800' }}
+              variants={heroTextVariants}
+              initial="initial"
+              animate="animate"
+            >
+              Elevate Your <br />
+              <span className="text-gradient">Digital Universe</span>
+            </motion.h1>
+            <motion.p
+              style={{ fontSize: '1.15rem', color: '#cbd5e1', marginBottom: '2rem', lineHeight: '1.6' }}
+              variants={heroSubtitleVariants}
+              initial="initial"
+              animate="animate"
+            >
+              Discover ultra-premium tech gear and curated items backed by an idempotent, reactive Saga pipeline for millisecond-precision checkout.
+            </motion.p>
+            <motion.div
+              style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}
+              variants={heroButtonVariants}
+              initial="initial"
+              animate="animate"
+            >
+              {user ? (
+                <Link to="/products" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.05rem', boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)' }}>
+                  <ShoppingBag size={20} /> Shop Catalog
+                </Link>
+              ) : (
+                <Link to="/register" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.05rem', boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)' }}>
+                  Start Free Account <ArrowRight size={20} />
+                </Link>
+              )}
+              <Link to="/products" className="btn btn-outline" style={{ padding: '1rem 2.2rem', fontSize: '1.05rem', background: 'rgba(255,255,255,0.04)' }}>
+                Explore Categories
               </Link>
-            ) : (
-              <Link to="/register" className="btn btn-primary" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem' }}>
-                Get Started Free <ArrowRight size={20} />
-              </Link>
-            )}
-            <Link to="/products" className="btn btn-outline" style={{ padding: '1rem 2.5rem', fontSize: '1.1rem', background: 'rgba(255,255,255,0.05)' }}>
-              Explore Categories
-            </Link>
-          </motion.div>
+            </motion.div>
+
+            {/* Quick trust metrics */}
+            <div style={{ display: 'flex', gap: '1.5rem', marginTop: '2.5rem', paddingTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                <Zap size={15} color="#38bdf8" />
+                <span>Zero Latency</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                <ShieldCheck size={15} color="#a855f7" />
+                <span>Bank-Grade Saga</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.85rem', color: '#94a3b8' }}>
+                <Sparkles size={15} color="#10b981" />
+                <span>AI Curated</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: 3D Holographic Tech HUD Card */}
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <HeroTechCard />
+          </div>
         </div>
       </motion.section>
 
+      {/* Cyberpunk Status Ticker */}
+      <CyberTicker />
+
       {/* Featured Products Section */}
       <motion.section
-        style={{ marginBottom: '2rem' }}
+        style={{ marginBottom: '3rem' }}
         variants={staggerContainer}
         initial="initial"
         whileInView="animate"
         viewport={{ once: true, amount: 0.2 }}
       >
         <motion.div variants={staggerItem} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h2>Featured Products</h2>
+          <div>
+            <span style={{ fontSize: '0.8rem', fontWeight: '700', letterSpacing: '1px', textTransform: 'uppercase', color: 'var(--accent-primary)' }}>
+              Curated Selection
+            </span>
+            <h2 style={{ margin: '0.25rem 0 0 0' }}>Featured Hardware & Gear</h2>
+          </div>
           <Link to="/products" className="btn btn-outline" style={{ padding: '0.5rem 1rem' }}>
-            View All
+            View Full Catalog <ArrowRight size={14} />
           </Link>
         </motion.div>
         {isLoading ? (
           <ProductGridSkeleton count={3} />
         ) : featuredProducts.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
-            {featuredProducts.map((product, i) => (
+            {featuredProducts.map((product) => (
               <TiltCard key={product.id} maxTilt={6}>
                 <MouseSpotlight
                   className="glass glass-card"
                   style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}
                 >
                   <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                    <motion.div
-                      style={{ height: '150px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}
-                      variants={cardHover}
-                      initial="rest"
-                      whileHover="hover"
-                    >
-                      <motion.div
-                        style={{ position: 'absolute', width: '100px', height: '100px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.5 }}
-                        variants={floatingOrb}
-                        animate="animate"
-                      />
-                    </motion.div>
-                    <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{product.name}</h3>
-                    <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem' }}>
+                    <ProductVisual name={product.name} category={product.categoryName} />
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>{product.name}</h3>
+                    <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem', fontSize: '0.9rem' }}>
                       {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
                     </p>
                   </Link>
                   <div className="flex-between" style={{ marginTop: 'auto' }}>
-                    <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
+                    <span style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
                       ${product.price}
                     </span>
                     <motion.button
@@ -261,7 +308,7 @@ export default function Home() {
                       whileHover={{ scale: 1.08 }}
                       whileTap={{ scale: 0.95 }}
                     >
-                      <ShoppingCart size={16} /> Add
+                      <ShoppingCart size={16} /> Add to Cart
                     </motion.button>
                   </div>
                 </MouseSpotlight>
@@ -292,51 +339,41 @@ export default function Home() {
           </motion.div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
             {recommendedProducts.map((product, i) => (
-              <motion.div
-                key={product.id}
-                className="glass glass-card"
-                style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', position: 'relative' }}
-                variants={staggerItem}
-                initial="initial"
-                whileInView="animate"
-                viewport={{ once: true }}
-                custom={i}
-              >
-                <motion.div
-                  style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--accent-gradient)', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)' }}
-                  initial={{ scale: 0, rotate: -20 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ delay: 0.3 + i * 0.1, type: 'spring', stiffness: 260, damping: 20 }}
+              <TiltCard key={product.id} maxTilt={6}>
+                <MouseSpotlight
+                  className="glass glass-card"
+                  style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}
                 >
-                  {product.aiReason}
-                </motion.div>
-                <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <div style={{ height: '150px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                    <motion.div
-                      style={{ position: 'absolute', width: '100px', height: '100px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.5 }}
-                      variants={floatingOrb}
-                      animate="animate"
-                    />
-                  </div>
-                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{product.name}</h3>
-                  <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem' }}>
-                    {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
-                  </p>
-                </Link>
-                <div className="flex-between" style={{ marginTop: 'auto' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
-                    ${product.price}
-                  </span>
-                  <motion.button
-                    className="btn btn-primary"
-                    onClick={() => handleAddToCart(product)}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.95 }}
+                  <motion.div
+                    style={{ position: 'absolute', top: '-10px', right: '-10px', background: 'var(--accent-gradient)', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '20px', fontSize: '0.75rem', fontWeight: 'bold', boxShadow: '0 4px 12px rgba(139, 92, 246, 0.3)', zIndex: 10 }}
+                    initial={{ scale: 0, rotate: -20 }}
+                    animate={{ scale: 1, rotate: 0 }}
+                    transition={{ delay: 0.3 + i * 0.1, type: 'spring', stiffness: 260, damping: 20 }}
                   >
-                    <ShoppingCart size={16} /> Add
-                  </motion.button>
-                </div>
-              </motion.div>
+                    {product.aiReason}
+                  </motion.div>
+                  <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                    <ProductVisual name={product.name} category={product.categoryName} />
+                    <h3 style={{ fontSize: '1.2rem', marginBottom: '0.4rem' }}>{product.name}</h3>
+                    <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem', fontSize: '0.9rem' }}>
+                      {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
+                    </p>
+                  </Link>
+                  <div className="flex-between" style={{ marginTop: 'auto' }}>
+                    <span style={{ fontSize: '1.3rem', fontWeight: '700', color: 'var(--accent-primary)', fontFamily: 'monospace' }}>
+                      ${product.price}
+                    </span>
+                    <motion.button
+                      className="btn btn-primary"
+                      onClick={() => handleAddToCart(product)}
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <ShoppingCart size={16} /> Add to Cart
+                    </motion.button>
+                  </div>
+                </MouseSpotlight>
+              </TiltCard>
             ))}
           </div>
         </motion.section>

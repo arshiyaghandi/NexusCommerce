@@ -8,6 +8,9 @@ import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import PageTransition from '../components/PageTransition';
+import ProductVisual from '../components/ProductVisual';
+import AnimatedCounter from '../components/AnimatedCounter';
+import TiltCard from '../components/TiltCard';
 
 /* ── animation variants ────────────────────────────────────────── */
 const infoContainer = {
@@ -87,36 +90,50 @@ export default function ProductDetails() {
           <ArrowLeft size={18} /> Back to Catalog
         </Link>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
-          {/* ── Product image area with floating orb ─────────────── */}
-          <motion.div
-            className="glass"
-            style={{ padding: '2rem', display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '400px' }}
-            initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-          >
-            <div style={{ textAlign: 'center' }}>
-              <motion.div
-                style={{ width: '250px', height: '250px', background: 'var(--accent-gradient)', borderRadius: '50%', margin: '0 auto 2rem', opacity: 0.8, filter: 'blur(40px)' }}
-                {...orbFloat}
-              />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '3rem', alignItems: 'start' }}>
+          {/* ── Futuristic Holographic Product Visual ─────────────── */}
+          <TiltCard maxTilt={6} glare={true}>
+            <div
+              className="glass"
+              style={{
+                padding: '2.5rem',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                minHeight: '420px',
+                borderRadius: '24px',
+                border: '1px solid rgba(139, 92, 246, 0.2)',
+                boxShadow: '0 20px 50px rgba(0, 0, 0, 0.6)',
+              }}
+            >
+              <div style={{ width: '100%', maxWidth: '320px' }}>
+                <ProductVisual name={product.name} category={product.categoryName} />
+              </div>
+              <div style={{ display: 'flex', gap: '1rem', marginTop: '1.5rem' }}>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', padding: '0.3rem 0.8rem', borderRadius: '20px', background: 'rgba(59, 130, 246, 0.15)', color: '#60a5fa', border: '1px solid rgba(59, 130, 246, 0.3)' }}>
+                  AUTHENTIC HARDWARE
+                </span>
+                <span style={{ fontSize: '0.75rem', fontWeight: '600', padding: '0.3rem 0.8rem', borderRadius: '20px', background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                  IMMEDIATE SAGA DISPATCH
+                </span>
+              </div>
             </div>
-          </motion.div>
+          </TiltCard>
 
           {/* ── Product info – slides in from the right ─────────── */}
           <motion.div variants={infoContainer} initial="hidden" animate="show">
-            <motion.h2 variants={infoItem} style={{ fontSize: '2.5rem', marginBottom: '1rem' }}>
+            <motion.h2 variants={infoItem} style={{ fontSize: '2.5rem', marginBottom: '0.75rem', fontWeight: '800' }}>
               {product.name}
             </motion.h2>
 
-            <motion.div variants={infoItem} style={{ fontSize: '2rem', fontWeight: '700', color: 'var(--accent-primary)', marginBottom: '1.5rem' }}>
-              ${product.price}
+            <motion.div variants={infoItem} style={{ fontSize: '2.4rem', fontWeight: '800', color: 'var(--accent-primary)', marginBottom: '1.5rem', fontFamily: 'monospace' }}>
+              <AnimatedCounter value={product.price} prefix="$" decimals={2} duration={0.8} />
             </motion.div>
 
-            <motion.div variants={infoItem} className="glass" style={{ padding: '1.5rem', marginBottom: '2rem' }}>
-              <h4 style={{ marginBottom: '0.5rem' }}>Description</h4>
-              <p className="text-muted" style={{ lineHeight: '1.8' }}>{product.description}</p>
+            <motion.div variants={infoItem} className="glass" style={{ padding: '1.5rem', marginBottom: '2rem', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <h4 style={{ marginBottom: '0.5rem', color: '#e2e8f0' }}>Description & Specifications</h4>
+              <p className="text-muted" style={{ lineHeight: '1.8', fontSize: '0.95rem' }}>{product.description}</p>
             </motion.div>
 
             {/* ── Stock badge – pops in with spring ──────────────── */}
