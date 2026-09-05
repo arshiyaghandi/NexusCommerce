@@ -39,13 +39,11 @@ public class SecurityConfig {
                         .bearerTokenConverter(exchange -> {
                             org.springframework.http.HttpCookie cookie = exchange.getRequest().getCookies().getFirst("NEXUS_TOKEN");
                             if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
-                                return reactor.core.publisher.Mono.just(cookie.getValue());
+                                return reactor.core.publisher.Mono.just(
+                                        new org.springframework.security.oauth2.server.resource.authentication.BearerTokenAuthenticationToken(cookie.getValue())
+                                );
                             }
-                            String authHeader = exchange.getRequest().getHeaders().getFirst(org.springframework.http.HttpHeaders.AUTHORIZATION);
-                            if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                                return reactor.core.publisher.Mono.just(authHeader.substring(7));
-                            }
-                            return reactor.core.publisher.Mono.empty();
+                            return new org.springframework.security.oauth2.server.resource.web.server.authentication.ServerBearerTokenAuthenticationConverter().convert(exchange);
                         })
                         .jwt(Customizer.withDefaults()));
 
