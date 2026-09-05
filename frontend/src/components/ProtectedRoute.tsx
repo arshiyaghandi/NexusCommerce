@@ -38,7 +38,7 @@ export function AdminRoute() {
     return <Navigate to={`/login?redirect=${redirect}`} replace />;
   }
 
-  if (!user.roles.includes('ROLE_ADMIN')) {
+  if (!user?.roles?.includes('ROLE_ADMIN')) {
     return <Navigate to="/" replace />;
   }
 

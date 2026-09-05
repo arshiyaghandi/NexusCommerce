@@ -35,7 +35,19 @@ public class SecurityConfig {
                         .anyExchange().authenticated()
                 )
                 .oauth2Login(Customizer.withDefaults())
-                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
+                .oauth2ResourceServer(oauth2 -> oauth2
+                        .bearerTokenConverter(exchange -> {
+                            org.springframework.http.HttpCookie cookie = exchange.getRequest().getCookies().getFirst("NEXUS_TOKEN");
+                            if (cookie != null && cookie.getValue() != null && !cookie.getValue().isBlank()) {
+                                return reactor.core.publisher.Mono.just(cookie.getValue());
+                            }
+                            String authHeader = exchange.getRequest().getHeaders().getFirst(org.springframework.http.HttpHeaders.AUTHORIZATION);
+                            if (authHeader != null && authHeader.startsWith("Bearer ")) {
+                                return reactor.core.publisher.Mono.just(authHeader.substring(7));
+                            }
+                            return reactor.core.publisher.Mono.empty();
+                        })
+                        .jwt(Customizer.withDefaults()));
 
         return http.build();
     }

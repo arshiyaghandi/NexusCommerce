@@ -29,8 +29,9 @@ export default function ProductVisual({ name, category, className = '' }: Produc
   const Icon = getProductIcon(name, category);
 
   // Generate a consistent hue shift based on product name
+  const safeName = name || 'Product';
   let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  for (let i = 0; i < safeName.length; i++) hash = safeName.charCodeAt(i) + ((hash << 5) - hash);
   const isAltColor = Math.abs(hash) % 2 === 0;
 
   const primaryGlow = isAltColor ? '#8b5cf6' : '#3b82f6';

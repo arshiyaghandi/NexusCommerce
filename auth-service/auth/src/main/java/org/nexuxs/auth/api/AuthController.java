@@ -106,17 +106,38 @@ public class AuthController {
         Map<String, Object> realmAccess = jwt.getClaim("realm_access");
         List<String> roles = new ArrayList<>();
         if (realmAccess != null && realmAccess.containsKey("roles")) {
-            List<String> kRoles = (List<String>) realmAccess.get("roles");
-            for (String r : kRoles) {
-                roles.add("ROLE_" + r.toUpperCase());
+            Object rolesObj = realmAccess.get("roles");
+            if (rolesObj instanceof List<?> kRoles) {
+                for (Object r : kRoles) {
+                    if (r != null) {
+                        roles.add("ROLE_" + r.toString().toUpperCase());
+                    }
+                }
             }
         }
 
-        return Mono.just(Map.of(
-                "name", jwt.getClaimAsString("name") != null ? jwt.getClaimAsString("name") : jwt.getClaimAsString("preferred_username"),
-                "email", jwt.getClaimAsString("email") != null ? jwt.getClaimAsString("email") : "No Email",
-                "roles", roles
-        ));
+        String name = jwt.getClaimAsString("name");
+        if (name == null || name.isBlank()) {
+            name = jwt.getClaimAsString("preferred_username");
+        }
+        if (name == null || name.isBlank()) {
+            name = jwt.getSubject();
+        }
+        if (name == null || name.isBlank()) {
+            name = "User";
+        }
+
+        String email = jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            email = "No Email";
+        }
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("name", name);
+        response.put("email", email);
+        response.put("roles", roles);
+
+        return Mono.just(response);
     }
 
     @PostMapping("/register")

@@ -14,7 +14,9 @@ export default function Layout() {
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: cartItems } = useCartCount(!!user);
-  const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const cartItemCount = Array.isArray(cartItems)
+    ? cartItems.reduce((sum, item) => sum + (item?.quantity || 0), 0)
+    : 0;
 
   const handleLogout = () => {
     queryClient.clear();
@@ -62,7 +64,7 @@ export default function Layout() {
             </Link>
             {user ? (
               <>
-                {user.roles.includes('ROLE_ADMIN') && (
+                {user?.roles?.includes('ROLE_ADMIN') && (
                   <Link
                     to="/admin"
                     className="nav-link"
@@ -134,7 +136,7 @@ export default function Layout() {
                     cursor: 'default',
                   }}
                 >
-                  <User size={18} /> {user.name}
+                  <User size={18} /> {user?.name || 'User'}
                 </div>
                 <button
                   onClick={handleLogout}
