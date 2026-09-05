@@ -1,38 +1,41 @@
 server:
-  port: 8083
+  port: ${PORT:8083}
 
 spring:
   application:
     name: inventory-service
   r2dbc:
-    url: r2dbc:postgresql://localhost:5433/inventory_db
-    username: admin
-    password: admin
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:inventory_db}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:admin}
   data:
     redis:
-      host: localhost
-      port: 6379
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
       database: 1
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8081/realms/nexus-realm
-          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm/protocol/openid-connect/certs
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
       properties:
         spring.json.add.type.headers: false
+    consumer:
+      auto-offset-reset: earliest
 
 eureka:
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
@@ -44,7 +47,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics,env
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:

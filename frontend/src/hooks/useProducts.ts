@@ -2,10 +2,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, getProduct, createProduct, updateProduct, deleteProduct } from '../api/products';
 import type { ProductRequest } from '../types';
 
-export function useProducts(search?: string) {
+export function useProducts(search?: string, categoryId?: number) {
   return useQuery({
-    queryKey: ['products', search],
-    queryFn: () => getProducts(search),
+    queryKey: ['products', search, categoryId],
+    queryFn: () => getProducts(search, categoryId),
   });
 }
 

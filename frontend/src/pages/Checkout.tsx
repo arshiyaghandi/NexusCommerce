@@ -3,12 +3,18 @@ import { CreditCard, MapPin, Loader2, ShoppingBag } from 'lucide-react';
 import { useCart } from '../hooks/useCart';
 import { usePlaceOrder } from '../hooks/useOrders';
 import { useToast } from '../contexts/ToastContext';
+import PageTransition from '../components/PageTransition';
+import Confetti from '../components/Confetti';
+import AnimatedCounter from '../components/AnimatedCounter';
+import { useState } from 'react';
 
 export default function Checkout() {
   const navigate = useNavigate();
   const { items, isLoading } = useCart();
   const placeOrderMutation = usePlaceOrder();
   const { addToast } = useToast();
+
+  const [orderSuccess, setOrderSuccess] = useState(false);
 
   const handlePlaceOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,8 +24,9 @@ export default function Checkout() {
     }
     try {
       await placeOrderMutation.mutateAsync();
+      setOrderSuccess(true);
       addToast('Order placed! Processing payment via Saga...', 'success');
-      navigate('/orders');
+      setTimeout(() => navigate('/orders'), 2500); // Wait for confetti before redirecting
     } catch {
       addToast('Failed to place order. Please try again.', 'error');
     }
@@ -37,7 +44,8 @@ export default function Checkout() {
   const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
   return (
-    <div className="animate-fade-in-up">
+    <PageTransition>
+      <Confetti active={orderSuccess} />
       <h2 style={{ marginBottom: '2rem', fontSize: '2rem' }}>Checkout</h2>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem' }}>
@@ -60,7 +68,9 @@ export default function Checkout() {
               ))}
               <div className="flex-between" style={{ paddingTop: '0.75rem', fontSize: '1.25rem', fontWeight: '700' }}>
                 <span>Total</span>
-                <span style={{ color: 'var(--accent-primary)' }}>${total.toFixed(2)}</span>
+                <span style={{ color: 'var(--accent-primary)' }}>
+                  <AnimatedCounter value={total} prefix="$" decimals={2} duration={0.8} />
+                </span>
               </div>
             </div>
           )}
@@ -89,7 +99,7 @@ export default function Checkout() {
 
             <button
               type="submit"
-              disabled={placeOrderMutation.isPending || items.length === 0}
+              disabled={placeOrderMutation.isPending || items.length === 0 || orderSuccess}
               className="btn btn-primary"
               style={{
                 width: '100%',
@@ -99,13 +109,15 @@ export default function Checkout() {
                 justifyContent: 'center',
                 alignItems: 'center',
                 gap: '0.5rem',
-                opacity: placeOrderMutation.isPending || items.length === 0 ? 0.6 : 1,
-                cursor: placeOrderMutation.isPending || items.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: placeOrderMutation.isPending || items.length === 0 || orderSuccess ? 0.6 : 1,
+                cursor: placeOrderMutation.isPending || items.length === 0 || orderSuccess ? 'not-allowed' : 'pointer',
                 boxShadow: '0 8px 32px rgba(108, 92, 231, 0.4)',
               }}
             >
               {placeOrderMutation.isPending ? (
                 <><Loader2 size={20} className="spin" /> Processing...</>
+              ) : orderSuccess ? (
+                <>Order Placed!</>
               ) : (
                 <><CreditCard size={20} /> Pay ${total.toFixed(2)}</>
               )}
@@ -113,6 +125,6 @@ export default function Checkout() {
           </form>
         </div>
       </div>
-    </div>
+    </PageTransition>
   );
 }

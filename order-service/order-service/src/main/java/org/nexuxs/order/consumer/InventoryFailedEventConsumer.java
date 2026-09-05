@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.messaging.contracts.NexusTopics;
 import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.order.service.OrderService;
+import org.nexuxs.order.data.model.Order;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -31,12 +32,14 @@ public class InventoryFailedEventConsumer {
         log.info("[order] inventory.failed | orderId={} skuCode={} reason={}",
                 event.orderId(), event.skuCode(), event.reason());
 
-        orderService.applyInventoryFailure(event.orderId())
-                .subscribe(
-                        order -> log.info("[order] saga applied | orderId={} -> {}",
-                                order.getId(), order.getStatus()),
-                        error -> log.error("[order] failed to reject order for orderId={}",
-                                event.orderId(), error)
-                );
+        try {
+            Order order = orderService.applyInventoryFailure(event.orderId()).block(java.time.Duration.ofSeconds(30));
+            if (order != null) {
+                log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
+            }
+        } catch (Exception e) {
+            log.error("[order] failed to reject order for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

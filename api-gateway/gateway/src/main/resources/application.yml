@@ -40,6 +40,10 @@ spring:
           uri: lb://product-service
           predicates:
             - Path=/api/products/**
+        - id: category-service
+          uri: lb://product-service
+          predicates:
+            - Path=/api/categories/**
         - id: cart-service
           uri: lb://cart-service
           predicates:
@@ -140,7 +144,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics,env
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:

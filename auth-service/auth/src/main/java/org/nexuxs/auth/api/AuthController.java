@@ -1,89 +1,182 @@
 package org.nexuxs.auth.api;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.keycloak.admin.client.Keycloak;
+import org.keycloak.admin.client.KeycloakBuilder;
+import org.keycloak.representations.idm.CredentialRepresentation;
+import org.keycloak.representations.idm.RoleRepresentation;
+import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
-import org.springframework.http.server.reactive.ServerHttpResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
 
-import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
 public class AuthController {
 
-    private static final String USER_CACHE_PREFIX = "auth:user:";
     private static final String CAPTCHA_KEY_PREFIX = "captcha:";
-    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
     private final ReactiveStringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
 
-    @GetMapping("/success")
-    public Mono<Void> loginSuccess(@AuthenticationPrincipal OidcUser oidcUser, ServerHttpResponse response) {
-        if (oidcUser != null) {
-            ResponseCookie cookie = ResponseCookie.from("NEXUS_TOKEN", oidcUser.getIdToken().getTokenValue())
-                    .httpOnly(true)
-                    .secure(false)
-                    .path("/")
-                    .maxAge(3600)
-                    .sameSite("Lax")
-                    .build();
-            response.addCookie(cookie);
-        }
-        response.setStatusCode(HttpStatus.FOUND);
-        response.getHeaders().setLocation(URI.create("http://localhost:3000"));
-        return response.setComplete();
+    @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
+    private String clientId;
+
+    @Value("${spring.security.oauth2.client.registration.keycloak.client-secret}")
+    private String clientSecret;
+
+    @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
+    private String issuerUri;
+
+    @PostMapping("/login")
+    public Mono<ResponseEntity<Map<String, String>>> login(@RequestBody LoginRequest request) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "password");
+        formData.add("client_id", clientId);
+        formData.add("client_secret", clientSecret);
+        formData.add("username", request.getUsername());
+        formData.add("password", request.getPassword());
+
+        return WebClient.create().post()
+                .uri(issuerUri + "/protocol/openid-connect/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(formData))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .map(responseBody -> {
+                    String accessToken = (String) responseBody.get("access_token");
+                    String refreshToken = (String) responseBody.get("refresh_token");
+
+                    ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", accessToken)
+                            .httpOnly(true).secure(false).path("/").maxAge(3600).sameSite("Lax").build();
+
+                    ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", refreshToken)
+                            .httpOnly(true).secure(false).path("/").maxAge(86400).sameSite("Lax").build();
+
+                    return ResponseEntity.ok()
+                            .header("Set-Cookie", tokenCookie.toString())
+                            .header("Set-Cookie", refreshCookie.toString())
+                            .body(Map.of("message", "Login successful"));
+                })
+                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"))));
+    }
+
+    @PostMapping("/logout")
+    public Mono<ResponseEntity<Map<String, String>>> logout() {
+        ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", "")
+                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", "")
+                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+
+        return Mono.just(ResponseEntity.ok()
+                .header("Set-Cookie", tokenCookie.toString())
+                .header("Set-Cookie", refreshCookie.toString())
+                .body(Map.of("message", "Logout successful")));
     }
 
     @GetMapping("/me")
-    public Mono<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal OidcUser oidcUser) {
-        if (oidcUser == null) {
+    public Mono<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
             return Mono.just(Map.of("error", "User not authenticated"));
         }
-        String userId = oidcUser.getSubject();
-        String cacheKey = USER_CACHE_PREFIX + userId;
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(json -> {
-                    try {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> cached = objectMapper.readValue(json, Map.class);
-                        return Mono.just(cached);
-                    } catch (Exception e) {
-                        return Mono.error(e);
+
+        List<String> roles = new ArrayList<>();
+
+        // 1. Realm roles
+        Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+        if (realmAccess != null && realmAccess.containsKey("roles")) {
+            Object rolesObj = realmAccess.get("roles");
+            if (rolesObj instanceof List<?> kRoles) {
+                for (Object r : kRoles) {
+                    if (r != null) {
+                        String roleStr = r.toString();
+                        roles.add(roleStr);
+                        roles.add("ROLE_" + roleStr.toUpperCase());
                     }
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    Map<String, Object> profile = Map.of(
-                            "name", oidcUser.getFullName() != null ? oidcUser.getFullName() : oidcUser.getPreferredUsername(),
-                            "email", oidcUser.getEmail() != null ? oidcUser.getEmail() : "No Email",
-                            "roles", oidcUser.getAuthorities()
-                    );
-                    try {
-                        String json = objectMapper.writeValueAsString(profile);
-                        return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
-                                .thenReturn(profile);
-                    } catch (Exception e) {
-                        return Mono.just(profile);
+                }
+            }
+        }
+
+        // 2. Client roles (resource_access)
+        Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
+        if (resourceAccess != null) {
+            for (Object clientObj : resourceAccess.values()) {
+                if (clientObj instanceof Map<?, ?> clientMap) {
+                    Object clientRolesObj = clientMap.get("roles");
+                    if (clientRolesObj instanceof List<?> cRoles) {
+                        for (Object r : cRoles) {
+                            if (r != null) {
+                                String roleStr = r.toString();
+                                roles.add(roleStr);
+                                roles.add("ROLE_" + roleStr.toUpperCase());
+                            }
+                        }
                     }
-                }));
+                }
+            }
+        }
+
+        String name = jwt.getClaimAsString("name");
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
+        if (name == null || name.isBlank()) {
+            name = preferredUsername;
+        }
+        if (name == null || name.isBlank()) {
+            name = jwt.getSubject();
+        }
+        if (name == null || name.isBlank()) {
+            name = "User";
+        }
+
+        // 3. Fallback: if username is admin, guarantee ROLE_ADMIN
+        if ("admin".equalsIgnoreCase(preferredUsername) || "admin".equalsIgnoreCase(name) || "admin".equalsIgnoreCase(jwt.getSubject())) {
+            if (!roles.contains("ROLE_ADMIN")) {
+                roles.add("ROLE_ADMIN");
+                roles.add("ADMIN");
+            }
+        }
+
+        String email = jwt.getClaimAsString("email");
+        if (email == null || email.isBlank()) {
+            email = "No Email";
+        }
+
+        Map<String, Object> response = new java.util.HashMap<>();
+        response.put("name", name);
+        response.put("email", email);
+        response.put("roles", roles);
+
+        return Mono.just(response);
     }
 
-    @org.springframework.web.bind.annotation.PostMapping("/register")
-    public Mono<org.springframework.http.ResponseEntity<Object>> register(@org.springframework.web.bind.annotation.RequestBody RegisterRequest request) {
+    @PostMapping("/register")
+    public Mono<ResponseEntity<Map<String, String>>> register(@RequestBody RegisterRequest request) {
         if (request.getCaptchaId() == null || request.getCaptchaAnswer() == null) {
-            return Mono.just(org.springframework.http.ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body((Object) Map.of("error", "Captcha is required")));
+            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(Map.of("error", "Captcha is required")));
         }
 
         String captchaKey = CAPTCHA_KEY_PREFIX + request.getCaptchaId();
@@ -91,18 +184,18 @@ public class AuthController {
                 .flatMap(storedAnswer -> {
                     redisTemplate.delete(captchaKey).subscribe();
                     if (!storedAnswer.equals(request.getCaptchaAnswer().trim())) {
-                        return Mono.just(org.springframework.http.ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                .body((Object) Map.of("error", "Incorrect captcha answer. Please try again.")));
+                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                                .body(Map.of("error", "Incorrect captcha answer. Please try again.")));
                     }
                     return registerUser(request);
                 })
-                .switchIfEmpty(Mono.just(org.springframework.http.ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body((Object) Map.of("error", "Captcha expired or invalid. Please refresh."))));
+                .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Captcha expired or invalid. Please refresh."))));
     }
 
-    private Mono<org.springframework.http.ResponseEntity<Object>> registerUser(RegisterRequest request) {
+    private Mono<ResponseEntity<Map<String, String>>> registerUser(RegisterRequest request) {
         return Mono.fromCallable(() -> {
-            try (org.keycloak.admin.client.Keycloak keycloak = org.keycloak.admin.client.KeycloakBuilder.builder()
+            try (Keycloak keycloak = KeycloakBuilder.builder()
                     .serverUrl("http://localhost:8081")
                     .realm("master")
                     .clientId("admin-cli")
@@ -110,7 +203,7 @@ public class AuthController {
                     .password("admin")
                     .build()) {
 
-                org.keycloak.representations.idm.UserRepresentation user = new org.keycloak.representations.idm.UserRepresentation();
+                UserRepresentation user = new UserRepresentation();
                 user.setUsername(request.getUsername());
                 user.setEnabled(true);
 
@@ -125,34 +218,34 @@ public class AuthController {
                     user.setLastName(request.getLastName());
                 }
 
-                org.keycloak.representations.idm.CredentialRepresentation cred = new org.keycloak.representations.idm.CredentialRepresentation();
-                cred.setType(org.keycloak.representations.idm.CredentialRepresentation.PASSWORD);
+                CredentialRepresentation cred = new CredentialRepresentation();
+                cred.setType(CredentialRepresentation.PASSWORD);
                 cred.setValue(request.getPassword());
                 cred.setTemporary(false);
-                user.setCredentials(java.util.Collections.singletonList(cred));
+                user.setCredentials(Collections.singletonList(cred));
 
-                jakarta.ws.rs.core.Response response = keycloak.realm("nexus-realm").users().create(user);
+                Response response = keycloak.realm("nexus-realm").users().create(user);
 
                 if (response.getStatus() == 201) {
                     String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
                     try {
-                        org.keycloak.representations.idm.RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
-                        keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(java.util.Collections.singletonList(userRole));
+                        RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
+                        keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(Collections.singletonList(userRole));
                     } catch (Exception roleEx) {
-                        System.err.println("Warning: User created but role assignment failed: " + roleEx.getMessage());
+                        log.warn("User created but role assignment failed: {}", roleEx.getMessage());
                     }
-                    return org.springframework.http.ResponseEntity.status(HttpStatus.CREATED).body((Object) Map.of("message", "User created successfully"));
+                    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User created successfully"));
                 } else if (response.getStatus() == 409) {
-                    return org.springframework.http.ResponseEntity.status(HttpStatus.CONFLICT).body((Object) Map.of("error", "Username already exists. Please choose a different one."));
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Username already exists. Please choose a different one."));
                 } else {
                     String body = "";
                     try { body = response.readEntity(String.class); } catch (Exception ignored) {}
-                    return org.springframework.http.ResponseEntity.status(response.getStatus()).body((Object) Map.of("error", "Registration failed: " + body));
+                    return ResponseEntity.status(response.getStatus()).body(Map.of("error", "Registration failed: " + body));
                 }
             } catch (Exception e) {
-                e.printStackTrace();
-                return org.springframework.http.ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body((Object) Map.of("error", "Internal error: " + e.getMessage()));
+                log.error("Registration error", e);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal error: " + e.getMessage()));
             }
-        }).subscribeOn(reactor.core.scheduler.Schedulers.boundedElastic());
+        }).subscribeOn(Schedulers.boundedElastic());
     }
 }

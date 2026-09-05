@@ -36,27 +36,48 @@ public class PaymentService {
     private BigDecimal declineAbove;
 
     public Mono<Void> processPayment(InventoryReservedEvent event) {
+        if (event.orderId() == null || event.userId() == null || event.totalPrice() == null) {
+            log.error("Invalid InventoryReservedEvent: missing required fields");
+            return Mono.empty();
+        }
+
         log.info("Saga Execution: Processing payment for Order: {}, User: {}, Amount: {}",
                 event.orderId(), event.userId(), event.totalPrice());
 
-        boolean hasSufficientFunds = event.totalPrice() != null
-                && event.totalPrice().compareTo(declineAbove) <= 0;
+        return paymentRepository.findByOrderId(event.orderId())
+                .flatMap(existingPayment -> {
+                    log.info("Payment already processed for orderId={}", event.orderId());
+                    return Mono.<Void>empty();
+                })
+                .switchIfEmpty(Mono.defer(() -> {
+                    boolean hasSufficientFunds = event.totalPrice().compareTo(BigDecimal.ZERO) > 0
+                            && event.totalPrice().compareTo(declineAbove) <= 0;
 
-        if (hasSufficientFunds) {
-            Payment payment = Payment.builder()
-                    .orderId(event.orderId())
-                    .userId(event.userId())
-                    .amount(event.totalPrice())
-                    .status(PaymentStatus.COMPLETED)
-                    .build();
+                    if (hasSufficientFunds) {
+                        Payment payment = Payment.builder()
+                                .orderId(event.orderId())
+                                .userId(event.userId())
+                                .amount(event.totalPrice())
+                                .status(PaymentStatus.COMPLETED)
+                                .build();
 
-            return paymentRepository.save(payment)
-                    .flatMap(this::publishSuccess)
-                    .then();
-        } else {
-            log.warn("Payment failed for Order: {}. Insufficient funds.", event.orderId());
-            return publishFailure(event, "INSUFFICIENT_FUNDS");
-        }
+                        return paymentRepository.save(payment)
+                                .doOnNext(saved -> log.info("Saved Payment with ID: {} for orderId={}", saved.getId(), saved.getOrderId()))
+                                .flatMap(this::publishSuccess)
+                                .then();
+                    } else {
+                        log.warn("Payment failed for Order: {}. Insufficient funds.", event.orderId());
+                        Payment failedPayment = Payment.builder()
+                                .orderId(event.orderId())
+                                .userId(event.userId())
+                                .amount(event.totalPrice())
+                                .status(PaymentStatus.FAILED)
+                                .build();
+                        return paymentRepository.save(failedPayment)
+                                .doOnNext(saved -> log.info("Saved Failed Payment with ID: {} for orderId={}", saved.getId(), saved.getOrderId()))
+                                .flatMap(saved -> publishFailure(event, "INSUFFICIENT_FUNDS"));
+                    }
+                }));
     }
 
     private Mono<Void> publishSuccess(Payment payment) {
@@ -86,8 +107,8 @@ public class PaymentService {
 
         PaymentFailedEvent failedEvent = new PaymentFailedEvent(
                 event.orderId(),
-                items.isEmpty() ? null : items.get(0).productId(),
-                event.quantity(),
+                null,
+                items.stream().mapToInt(OrderLineRecord::quantity).sum(),
                 items,
                 reason,
                 Instant.now()

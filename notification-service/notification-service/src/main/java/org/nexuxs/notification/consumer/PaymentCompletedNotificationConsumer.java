@@ -11,6 +11,8 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+
 @Slf4j
 @Component
 @Profile("!test")
@@ -26,16 +28,18 @@ public class PaymentCompletedNotificationConsumer {
             containerFactory = "paymentCompletedListenerFactory"
     )
     public void consume(PaymentCompletedEvent event) {
-        broadcast(NexusTopics.PAYMENT_COMPLETED, event);
-    }
-
-    private void broadcast(String topic, Object event) {
         try {
-            String payload = objectMapper.writeValueAsString(event);
-            log.info("[notification] broadcasting {} event", topic);
-            notificationHub.broadcast(payload);
+            Map<String, Object> notification = Map.of(
+                    "type", "PAYMENT_COMPLETED",
+                    "orderId", event.orderId(),
+                    "status", "COMPLETED",
+                    "message", "Payment confirmed for order #" + event.orderId()
+            );
+            String payload = objectMapper.writeValueAsString(notification);
+            log.info("[notification] sending PAYMENT_COMPLETED to userId={}", event.userId());
+            notificationHub.sendToUser(event.userId(), payload);
         } catch (JsonProcessingException e) {
-            log.error("Failed to serialize event from topic {}", topic, e);
+            log.error("Failed to serialize PAYMENT_COMPLETED event", e);
         }
     }
 }

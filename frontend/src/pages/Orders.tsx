@@ -1,6 +1,9 @@
 import { Package, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { useOrders } from '../hooks/useOrders';
 import type { OrderStatus } from '../types';
+import PageTransition, { staggerContainer, staggerItem } from '../components/PageTransition';
+import { motion } from 'framer-motion';
+import { OrderGridSkeleton } from '../components/Skeleton';
 
 function getStatusColor(status: OrderStatus): string {
   switch (status) {
@@ -48,10 +51,15 @@ function StepIcon({ status, step }: { status: OrderStatus; step: 'pending' | 'pr
 export default function Orders() {
   const { data: orders, isLoading } = useOrders();
 
-  if (isLoading) return <div className="text-center mt-4 text-muted">Loading orders...</div>;
+  if (isLoading) return (
+    <PageTransition>
+      <h2 style={{ marginBottom: '2rem' }}>Your Orders</h2>
+      <OrderGridSkeleton count={4} />
+    </PageTransition>
+  );
 
   return (
-    <div>
+    <PageTransition>
       <h2 style={{ marginBottom: '2rem' }}>Your Orders</h2>
 
       {!orders || orders.length === 0 ? (
@@ -59,9 +67,14 @@ export default function Orders() {
           <p className="text-muted" style={{ fontSize: '1.25rem' }}>You haven't placed any orders yet.</p>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}>
+        <motion.div 
+          variants={staggerContainer}
+          initial="initial"
+          animate="animate"
+          style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '2rem' }}
+        >
           {orders.map((order) => (
-            <div key={order.id} className="glass" style={{ padding: '1.5rem' }}>
+            <motion.div key={order.id} variants={staggerItem} className="glass" style={{ padding: '1.5rem' }}>
               <div className="flex-between" style={{ marginBottom: '1rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
                   <span className="text-muted" style={{ fontSize: '0.875rem' }}>Order ID: #{order.id}</span>
@@ -115,10 +128,10 @@ export default function Orders() {
                 <span>Total</span>
                 <span style={{ color: 'var(--accent-primary)' }}>${order.totalPrice}</span>
               </div>
-            </div>
+            </motion.div>
           ))}
-        </div>
+        </motion.div>
       )}
-    </div>
+    </PageTransition>
   );
 }

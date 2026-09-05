@@ -1,9 +1,25 @@
+export interface Category {
+  id: number;
+  name: string;
+  description: string;
+  parentId: number | null;
+  children: Category[];
+}
+
+export interface CategoryRequest {
+  name: string;
+  description: string;
+  parentId: number | null;
+}
+
 export interface Product {
   id: number;
   skuCode: string;
   name: string;
   description: string;
   price: number;
+  categoryId: number | null;
+  categoryName: string | null;
 }
 
 export interface ProductRequest {
@@ -11,6 +27,7 @@ export interface ProductRequest {
   name: string;
   description: string;
   price: number;
+  categoryId: number | null;
 }
 
 export interface CartItem {

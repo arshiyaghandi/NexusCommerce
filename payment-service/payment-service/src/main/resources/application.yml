@@ -1,6 +1,5 @@
 server:
-  port: 8087
-
+  port: ${PORT:8087}
 spring:
   application:
     name: payment-service
@@ -8,43 +7,45 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://localhost:8081/realms/nexus-realm
-          jwk-set-uri: http://localhost:8081/realms/nexus-realm/protocol/openid-connect/certs
+          issuer-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm
+          jwk-set-uri: ${KEYCLOAK_URL:http://localhost:8081}/realms/nexus-realm/protocol/openid-connect/certs
   r2dbc:
-    url: r2dbc:postgresql://localhost:5433/payment_db
-    username: admin
-    password: admin
+    url: r2dbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:payment_db}
+    username: ${DB_USERNAME:admin}
+    password: ${DB_PASSWORD:admin}
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all
       properties:
         spring.json.add.type.headers: false
+        enable.idempotence: true
     consumer:
+      group-id: payment-service-group
+      auto-offset-reset: earliest
       key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
       value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
       properties:
         spring.json.trusted.packages: org.nexuxs.messaging.contracts.event
-
 eureka:
   client:
     register-with-eureka: true
     fetch-registry: true
     service-url:
-      defaultZone: http://localhost:8761/eureka/
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka/}
   instance:
     prefer-ip-address: true
     instance-id: ${spring.application.name}:${server.port}
     lease-renewal-interval-in-seconds: 10
     lease-expiration-duration-in-seconds: 30
     health-check-url-path: /actuator/health
-
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus,metrics,env
+        include: health,info,prometheus,metrics
   endpoint:
     health:
       probes:
@@ -56,11 +57,8 @@ management:
     tags:
       application: ${spring.application.name}
       platform: nexus-commerce
-
 nexus:
   kafka:
     enabled: true
   payment:
-    # Payments with an amount strictly greater than this are declined (Saga failure path).
-    # Set high by default so normal orders succeed; lower it to test compensation.
     decline-above: 100000

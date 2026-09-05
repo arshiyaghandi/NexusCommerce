@@ -2,9 +2,11 @@ package org.nexuxs.notification.config;
 
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.messaging.contracts.event.InventoryReservedEvent;
 import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
 import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
+import org.nexuxs.messaging.contracts.event.PaymentFailedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -40,6 +42,16 @@ public class KafkaConsumerConfig {
     }
 
     @Bean
+    public ConsumerFactory<String, InventoryFailedEvent> inventoryFailedConsumerFactory() {
+        return buildConsumerFactory(InventoryFailedEvent.class);
+    }
+
+    @Bean
+    public ConsumerFactory<String, PaymentFailedEvent> paymentFailedConsumerFactory() {
+        return buildConsumerFactory(PaymentFailedEvent.class);
+    }
+
+    @Bean
     public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderCreatedListenerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
@@ -60,6 +72,22 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, PaymentCompletedEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(paymentCompletedConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, InventoryFailedEvent> inventoryFailedListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, InventoryFailedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(inventoryFailedConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(paymentFailedConsumerFactory());
         return factory;
     }
 

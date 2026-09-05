@@ -11,23 +11,17 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory;
+import org.springframework.kafka.core.KafkaTemplate;
+import org.springframework.kafka.listener.DeadLetterPublishingRecoverer;
+import org.springframework.kafka.listener.DefaultErrorHandler;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
+import org.springframework.util.backoff.ExponentialBackOff;
 
+import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Kafka consumer infrastructure for inventory-service's role in the Saga.
- *
- * <p>inventory-service listens to two events:
- * <ul>
- *     <li>{@code nexus.order.created} – the first Saga hop: reserve stock and publish
- *         {@code nexus.inventory.reserved} (or {@code inventory.failed.topic}).</li>
- *     <li>{@code payment.failed.topic} – Saga compensation: release stock that was reserved
- *         before payment failed.</li>
- * </ul>
- * The deserialization target is pinned explicitly for each event because producers disable
- * type headers ({@code spring.json.add.type.headers=false}); the service's
- * {@code application.yml} therefore needs no consumer block.
  */
 @Configuration
 @Profile("!test")
@@ -40,29 +34,36 @@ public class KafkaConsumerConfig {
     private String bootstrapServers;
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderCreatedListenerFactory() {
-        return listenerFactory(OrderCreatedEvent.class);
+    public ConcurrentKafkaListenerContainerFactory<String, OrderCreatedEvent> orderCreatedListenerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        return listenerFactory(OrderCreatedEvent.class, kafkaTemplate);
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory() {
-        return listenerFactory(PaymentFailedEvent.class);
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedListenerFactory(KafkaTemplate<String, Object> kafkaTemplate) {
+        return listenerFactory(PaymentFailedEvent.class, kafkaTemplate);
     }
 
-    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType) {
+    private <T> ConcurrentKafkaListenerContainerFactory<String, T> listenerFactory(Class<T> eventType, KafkaTemplate<String, Object> kafkaTemplate) {
         ConcurrentKafkaListenerContainerFactory<String, T> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(buildConsumerFactory(eventType));
+        
+        DefaultErrorHandler errorHandler = new DefaultErrorHandler(
+                new DeadLetterPublishingRecoverer(kafkaTemplate),
+                new ExponentialBackOff(1000L, 2.0)
+        );
+        factory.setCommonErrorHandler(errorHandler);
+        
         return factory;
     }
 
     private <T> ConsumerFactory<String, T> buildConsumerFactory(Class<T> eventType) {
-        Map<String, Object> props = Map.of(
-                ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers,
-                ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID,
-                ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest",
-                ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class
-        );
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, GROUP_ID);
+        props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, "earliest");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, false);
 
         JsonDeserializer<T> jsonDeserializer = new JsonDeserializer<>(eventType, false);
         jsonDeserializer.addTrustedPackages(CONTRACTS_PACKAGE);

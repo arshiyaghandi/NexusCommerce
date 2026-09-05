@@ -16,8 +16,11 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers(HttpMethod.GET, "/api/products/**").permitAll()
-                        .pathMatchers("/actuator/**").permitAll()
+                        .pathMatchers("/actuator/**", "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**").permitAll()
+                        .pathMatchers(HttpMethod.GET, "/api/products/**", "/api/categories/**").permitAll()
+                        .pathMatchers(HttpMethod.POST, "/api/products/**", "/api/categories/**").hasAuthority("ROLE_ADMIN")
+                        .pathMatchers(HttpMethod.PUT, "/api/products/**", "/api/categories/**").hasAuthority("ROLE_ADMIN")
+                        .pathMatchers(HttpMethod.DELETE, "/api/products/**", "/api/categories/**").hasAuthority("ROLE_ADMIN")
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));

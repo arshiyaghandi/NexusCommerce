@@ -26,9 +26,11 @@ public class PaymentCompletedEventConsumer {
         log.info("[finance] payment.completed | paymentId={} orderId={} user={} amount={}",
                 event.paymentId(), event.orderId(), event.userId(), event.amount());
 
-        financeService.savePaymentTransaction(event).subscribe(
-                null,
-                error -> log.error("Failed to save transaction for Order: {}", event.orderId(), error)
-        );
+        try {
+            financeService.savePaymentTransaction(event).block();
+        } catch (Exception e) {
+            log.error("Failed to save transaction for Order: {}", event.orderId(), e);
+            throw e;
+        }
     }
 }

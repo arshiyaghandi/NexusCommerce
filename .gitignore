@@ -5,3 +5,32 @@ target/
 out/
 *.class
 *.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+.venv/
+*.egg-info/
+dist/
+build/
+*.sqlite3
+
+# Node / Frontend
+node_modules/
+dist/
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Maven
+*.jar
+!.mvn/wrapper/*.jar

@@ -15,8 +15,9 @@ ON CONFLICT (sku_code) DO NOTHING;
 -- event for the same order+product fails to insert a second row, so stock is
 -- released exactly once per product.
 CREATE TABLE IF NOT EXISTS processed_compensations (
+    id BIGSERIAL PRIMARY KEY,
     order_id     BIGINT NOT NULL,
     product_id   BIGINT NOT NULL,
-    processed_at TIMESTAMP NOT NULL DEFAULT now(),
-    PRIMARY KEY (order_id, product_id)
+    processed_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+    UNIQUE (order_id, product_id)
 );

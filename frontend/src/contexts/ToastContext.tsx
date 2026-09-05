@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from 'react';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -42,9 +43,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           pointerEvents: 'none',
         }}
       >
-        {toasts.map((toast) => (
-          <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
-        ))}
+        <AnimatePresence mode="popLayout">
+          {toasts.map((toast) => (
+            <ToastItem key={toast.id} toast={toast} onRemove={removeToast} />
+          ))}
+        </AnimatePresence>
       </div>
     </ToastContext.Provider>
   );
@@ -60,8 +63,13 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
     toast.type === 'success' ? '#10b981' : toast.type === 'error' ? '#ef4444' : 'var(--accent-primary)';
 
   return (
-    <div
-      className="glass animate-fade-in-up"
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: 50, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.9, transition: { duration: 0.2 } }}
+      whileHover={{ scale: 1.02 }}
+      className="glass"
       style={{
         padding: '1rem 1.5rem',
         display: 'flex',
@@ -71,6 +79,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
         minWidth: '300px',
         maxWidth: '400px',
         borderLeft: `4px solid ${borderColor}`,
+        boxShadow: '0 10px 40px -10px rgba(0,0,0,0.5)',
       }}
     >
       <div>
@@ -91,7 +100,7 @@ function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: string) =
       >
         <X size={18} />
       </button>
-    </div>
+    </motion.div>
   );
 }
 

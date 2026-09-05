@@ -22,3 +22,6 @@ CREATE TABLE IF NOT EXISTS processed_payments (
     order_id     BIGINT PRIMARY KEY,
     processed_at TIMESTAMP NOT NULL DEFAULT now()
 );
+
+CREATE INDEX IF NOT EXISTS idx_transactions_user_created ON transactions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_transactions_created ON transactions(created_at DESC);

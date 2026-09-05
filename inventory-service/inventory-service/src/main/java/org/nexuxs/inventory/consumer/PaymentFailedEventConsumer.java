@@ -10,6 +10,8 @@ import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 import reactor.core.publisher.Flux;
 
+import java.time.Duration;
+
 /**
  * Saga compensation listener: when a payment fails after stock was reserved, this
  * releases the reserved units back to inventory for ALL order lines. Compensation is
@@ -37,13 +39,15 @@ public class PaymentFailedEventConsumer {
             return;
         }
 
-        Flux.fromIterable(event.items())
-                .flatMap(item -> inventoryService.compensateReservation(
-                        event.orderId(), item.productId(), item.quantity()))
-                .subscribe(
-                        null,
-                        error -> log.error("[inventory] failed to compensate reservation for orderId={}",
-                                event.orderId(), error)
-                );
+        try {
+            Flux.fromIterable(event.items())
+                    .concatMap(item -> inventoryService.compensateReservation(
+                            event.orderId(), item.productId(), item.quantity()))
+                    .collectList()
+                    .block(Duration.ofSeconds(30));
+        } catch (Exception e) {
+            log.error("[inventory] failed to compensate reservation for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

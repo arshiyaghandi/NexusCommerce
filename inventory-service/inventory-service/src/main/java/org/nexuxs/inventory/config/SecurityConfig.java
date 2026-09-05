@@ -15,8 +15,8 @@ public class SecurityConfig {
         http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers(org.springframework.http.HttpMethod.GET, "/api/inventory/**").permitAll()
-                        .pathMatchers("/actuator/**").permitAll()
+                        .pathMatchers("/actuator/**", "/v3/api-docs/**", "/v3/api-docs", "/swagger-ui.html", "/swagger-ui/**", "/webjars/**").permitAll()
+                        .pathMatchers("/api/inventory/**").hasAuthority("SCOPE_inventory.read")
                         .anyExchange().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> {}));

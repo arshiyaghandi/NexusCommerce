@@ -9,11 +9,11 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 /**
- * Saga execution listener: the inventory-service reacts to a newly created order by
- * attempting to reserve stock. On success it publishes {@code nexus.inventory.reserved};
- * on failure it publishes {@code inventory.failed.topic}, which the order-service turns
- * into an immediate {@code REJECTED} order. This is the first hop of the choreography.
+ * Entry point for the inventory portion of the checkout Saga.
+ * Listens for new orders and attempts to reserve stock.
  */
 @Slf4j
 @Component
@@ -30,15 +30,13 @@ public class OrderCreatedEventConsumer {
     )
     public void consume(OrderCreatedEvent event) {
         log.info("[inventory] order.created | orderId={} userId={} items={}",
-                event.orderId(), event.userId(), event.items().size());
+                event.orderId(), event.userId(), event.items() != null ? event.items().size() : 0);
 
-        inventoryService.handleOrderCreated(event)
-                .subscribe(
-                        null,
-                        error -> {
-                            log.error("[inventory] failed to handle order.created for orderId={}",
-                                    event.orderId(), error);
-                        }
-                );
+        try {
+            inventoryService.handleOrderCreated(event).block(Duration.ofSeconds(30));
+        } catch (Exception e) {
+            log.error("[inventory] failed to handle order.created for orderId={}", event.orderId(), e);
+            throw e;
+        }
     }
 }

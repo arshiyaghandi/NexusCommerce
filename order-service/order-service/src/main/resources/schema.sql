@@ -14,3 +14,6 @@ CREATE TABLE IF NOT EXISTS order_lines (
     quantity    INT NOT NULL,
     unit_price  DECIMAL(10, 2) NOT NULL
 );
+
+CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
+CREATE INDEX IF NOT EXISTS idx_order_lines_order_id ON order_lines(order_id);

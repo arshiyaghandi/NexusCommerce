@@ -20,16 +20,16 @@ public class PaymentEventPublisher {
     private final KafkaTemplate<String, Object> kafkaTemplate;
 
     public Mono<Void> publishSuccessEvent(PaymentCompletedEvent event) {
-        return Mono.fromRunnable(() -> {
-            kafkaTemplate.send(NexusTopics.PAYMENT_COMPLETED, String.valueOf(event.orderId()), event);
-            log.info("Published {} for orderId={}", NexusTopics.PAYMENT_COMPLETED, event.orderId());
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.PAYMENT_COMPLETED, String.valueOf(event.orderId()), event))
+                .doOnSuccess(result -> log.info("Published {} for orderId={}", NexusTopics.PAYMENT_COMPLETED, event.orderId()))
+                .doOnError(error -> log.error("Failed to publish {} for orderId={}", NexusTopics.PAYMENT_COMPLETED, event.orderId(), error))
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 
     public Mono<Void> publishFailedEvent(PaymentFailedEvent event) {
-        return Mono.fromRunnable(() -> {
-            kafkaTemplate.send(NexusTopics.PAYMENT_FAILED, String.valueOf(event.orderId()), event);
-            log.error("Published {} for orderId={} due to: {}", NexusTopics.PAYMENT_FAILED, event.orderId(), event.reason());
-        }).subscribeOn(Schedulers.boundedElastic()).then();
+        return Mono.fromFuture(() -> kafkaTemplate.send(NexusTopics.PAYMENT_FAILED, String.valueOf(event.orderId()), event))
+                .doOnSuccess(result -> log.warn("Published {} for orderId={} due to: {}", NexusTopics.PAYMENT_FAILED, event.orderId(), event.reason()))
+                .doOnError(error -> log.error("Failed to publish {} for orderId={}", NexusTopics.PAYMENT_FAILED, event.orderId(), error))
+                .subscribeOn(Schedulers.boundedElastic()).then();
     }
 }

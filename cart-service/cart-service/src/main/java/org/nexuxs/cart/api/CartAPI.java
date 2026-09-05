@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -28,7 +29,7 @@ public class CartAPI {
     }
 
     @PostMapping("/items")
-    public Mono<List<CartItem>> addItem(@RequestBody AddCartItemRequest request) {
+    public Mono<List<CartItem>> addItem(@Valid @RequestBody AddCartItemRequest request) {
         return cartService.addItem(request);
     }
 

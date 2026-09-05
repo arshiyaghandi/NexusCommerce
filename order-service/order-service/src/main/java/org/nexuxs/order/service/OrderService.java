@@ -67,6 +67,7 @@ public class OrderService {
                                 }
                                 return Mono.empty();
                             } catch (Exception e) {
+                                log.warn("Failed to deserialize order from cache for orderId={}", orderId, e);
                                 return Mono.empty();
                             }
                         })
@@ -80,6 +81,7 @@ public class OrderService {
                                         return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
                                                 .thenReturn(response);
                                     } catch (Exception e) {
+                                        log.warn("Failed to serialize order to cache for orderId={}", orderId, e);
                                         return Mono.just(response);
                                     }
                                 }))
@@ -102,17 +104,18 @@ public class OrderService {
                         })
                         .flatMap(savedOrder -> {
                             OrderEventPublisher publisher = orderEventPublisherProvider.getIfAvailable();
-                            Mono<Void> published = publisher != null
-                                    ? publisher.publish(savedOrder) : Mono.empty();
-                            return published.thenReturn(
-                                    "Order placed successfully with Order Id: " + savedOrder.getId());
+                            if (publisher == null) {
+                                return Mono.error(new IllegalStateException("OrderEventPublisher is not available (Kafka disabled)"));
+                            }
+                            return publisher.publish(savedOrder)
+                                    .thenReturn("Order placed successfully with Order Id: " + savedOrder.getId());
                         })
                         .flatMap(message -> cartClient.clearCart().thenReturn(message)));
     }
 
     private Mono<Order> validateAndBuildOrder(String userId, List<CartItemDto> cartItems) {
         return Flux.fromIterable(cartItems)
-                .flatMap(cartItem -> productClient.getProduct(cartItem.productId())
+                .concatMap(cartItem -> productClient.getProduct(cartItem.productId())
                         .map(product -> {
                             log.info("Price check: cart productId={} cartPrice={}, serverPrice={}",
                                     cartItem.productId(), cartItem.unitPrice(), product.price());
@@ -179,9 +182,7 @@ public class OrderService {
                     return orderRepository.save(order)
                             .doOnNext(saved -> log.info("Order {} transitioned to {}", orderId, target));
                 })
-                .then(redisTemplate.delete(CACHE_KEY_PREFIX + orderId).then(orderRepository.findById(orderId)))
-                .switchIfEmpty(Mono.error(new IllegalStateException(
-                        "Cannot transition order: not found, orderId=" + orderId)));
+                .flatMap(saved -> redisTemplate.delete(CACHE_KEY_PREFIX + orderId).thenReturn(saved));
     }
 
     private boolean isTerminal(OrderStatus status) {

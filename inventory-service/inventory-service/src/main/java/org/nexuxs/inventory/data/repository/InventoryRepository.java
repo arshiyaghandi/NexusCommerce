@@ -18,4 +18,12 @@ public interface InventoryRepository extends ReactiveCrudRepository<Inventory, L
     @Modifying
     @Query("UPDATE t_inventory SET quantity = quantity - :qty WHERE sku_code = :sku AND quantity >= :qty RETURNING *")
     Mono<Inventory> decrementStock(String sku, int qty);
+
+    /**
+     * Atomically increments stock for a SKU. Used for Saga compensation to release
+     * reserved stock safely without read-modify-write race conditions.
+     */
+    @Modifying
+    @Query("UPDATE t_inventory SET quantity = quantity + :qty WHERE sku_code = :sku RETURNING *")
+    Mono<Inventory> incrementStock(String sku, int qty);
 }

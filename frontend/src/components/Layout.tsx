@@ -3,22 +3,42 @@ import { ShoppingCart, User, Package, LogOut, LayoutDashboard } from 'lucide-rea
 import { useAuth } from '../contexts/AuthContext';
 import { useQueryClient } from '@tanstack/react-query';
 import { useCartCount } from '../hooks/useCart';
+import { motion, AnimatePresence, useScroll, useTransform } from 'framer-motion';
+import ScrollProgress from './ScrollProgress';
+import ParticleCanvas from './ParticleCanvas';
+import CustomCursor from './CustomCursor';
+import ClickSparkle from './ClickSparkle';
 
 export default function Layout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const queryClient = useQueryClient();
   const { data: cartItems } = useCartCount(!!user);
-  const cartItemCount = cartItems?.reduce((sum, item) => sum + item.quantity, 0) ?? 0;
+  const cartItemCount = Array.isArray(cartItems)
+    ? cartItems.reduce((sum, item) => sum + (item?.quantity || 0), 0)
+    : 0;
 
   const handleLogout = () => {
     queryClient.clear();
     logout();
   };
 
+  const { scrollY } = useScroll();
+  const navPadding = useTransform(scrollY, [0, 100], ['1rem 1.5rem', '0.6rem 1.5rem']);
+  const navShadow = useTransform(scrollY, [0, 100], ['0 8px 32px 0 rgba(0, 0, 0, 0.37)', '0 4px 20px 0 rgba(0, 0, 0, 0.5)']);
+
+  const isAdmin = Boolean(
+    user?.roles?.some((r) => r.toUpperCase().includes('ADMIN')) ||
+    user?.name?.toLowerCase() === 'admin'
+  );
+
   return (
     <div className="container">
-      <nav className="navbar glass">
+      <ParticleCanvas />
+      <CustomCursor />
+      <ClickSparkle />
+      <ScrollProgress />
+      <motion.nav className="navbar glass" style={{ padding: navPadding, boxShadow: navShadow }}>
         <div className="nav-content container">
           <Link
             to="/"
@@ -49,7 +69,7 @@ export default function Layout() {
             </Link>
             {user ? (
               <>
-                {user.roles.includes('ROLE_ADMIN') && (
+                {isAdmin && (
                   <Link
                     to="/admin"
                     className="nav-link"
@@ -88,19 +108,28 @@ export default function Layout() {
                 >
                   <ShoppingCart size={18} />
                   Cart{' '}
-                  {cartItemCount > 0 && (
-                    <span
-                      style={{
-                        background: 'var(--accent-primary)',
-                        color: 'white',
-                        borderRadius: '10px',
-                        padding: '0 6px',
-                        fontSize: '12px',
-                      }}
-                    >
-                      {cartItemCount}
-                    </span>
-                  )}
+                  <AnimatePresence mode="popLayout">
+                    {cartItemCount > 0 && (
+                      <motion.span
+                        key={cartItemCount}
+                        initial={{ scale: 0, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0, opacity: 0 }}
+                        transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+                        style={{
+                          background: 'var(--accent-primary)',
+                          color: 'white',
+                          borderRadius: '10px',
+                          padding: '0 6px',
+                          fontSize: '12px',
+                          marginLeft: '4px',
+                          display: 'inline-block'
+                        }}
+                      >
+                        {cartItemCount}
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
                 </Link>
                 <div
                   className="nav-link"
@@ -112,7 +141,7 @@ export default function Layout() {
                     cursor: 'default',
                   }}
                 >
-                  <User size={18} /> {user.name}
+                  <User size={18} /> {user?.name || 'User'}
                 </div>
                 <button
                   onClick={handleLogout}
@@ -142,7 +171,7 @@ export default function Layout() {
             )}
           </div>
         </div>
-      </nav>
+      </motion.nav>
 
       <main style={{ minHeight: 'calc(100vh - 200px)' }}>
         <Outlet />

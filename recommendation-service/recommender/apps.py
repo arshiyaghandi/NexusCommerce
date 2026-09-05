@@ -12,7 +12,7 @@ class RecommenderConfig(AppConfig):
             import py_eureka_client.eureka_client as eureka_client
             
             EUREKA_SERVER = os.getenv("EUREKA_SERVER", "http://localhost:8761/eureka")
-            SERVICE_PORT = int(os.getenv("PORT", "8091"))
+            SERVICE_PORT = int(os.getenv("PORT", "8092"))
             SERVICE_NAME = "recommendation-service"
             
             try:
