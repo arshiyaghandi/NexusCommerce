@@ -6,6 +6,7 @@ import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory 
 import { useAdminOrders } from '../hooks/useOrders';
 import { useToast } from '../contexts/ToastContext';
 import type { Product, Category } from '../types';
+import AnimatedCounter from '../components/AnimatedCounter';
 
 // ─── Product form ────────────────────────────────────────────────────────────
 interface ProductFormData {
@@ -193,15 +194,17 @@ export default function AdminDashboard() {
         <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem', marginBottom: '3rem' }}>
             {[
-              { icon: <DollarSign size={32} color="var(--accent-primary)" />, bg: 'rgba(59,130,246,0.1)', label: 'Total Revenue', value: `$${summary?.totalAmount?.toFixed(2) ?? '0.00'}` },
-              { icon: <Activity size={32} color="#10b981" />, bg: 'rgba(16,185,129,0.1)', label: 'Total Transactions', value: summary?.transactionCount ?? 0 },
-              { icon: <CreditCard size={32} color="var(--accent-secondary)" />, bg: 'rgba(139,92,246,0.1)', label: 'Avg. Order Value', value: `$${summary?.transactionCount ? (summary.totalAmount / summary.transactionCount).toFixed(2) : '0.00'}` },
-            ].map(({ icon, bg, label, value }) => (
+              { icon: <DollarSign size={32} color="var(--accent-primary)" />, bg: 'rgba(59,130,246,0.1)', label: 'Total Revenue', prefix: '$', value: summary?.totalAmount ?? 0, decimals: 2 },
+              { icon: <Activity size={32} color="#10b981" />, bg: 'rgba(16,185,129,0.1)', label: 'Total Transactions', prefix: '', value: summary?.transactionCount ?? 0, decimals: 0 },
+              { icon: <CreditCard size={32} color="var(--accent-secondary)" />, bg: 'rgba(139,92,246,0.1)', label: 'Avg. Order Value', prefix: '$', value: summary?.transactionCount ? summary.totalAmount / summary.transactionCount : 0, decimals: 2 },
+            ].map(({ icon, bg, label, prefix, value, decimals }) => (
               <div key={label} className="glass glass-card" style={{ padding: '2rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
                 <div style={{ background: bg, padding: '1rem', borderRadius: '12px' }}>{icon}</div>
                 <div>
                   <p className="text-muted" style={{ fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '1px' }}>{label}</p>
-                  <h3 style={{ fontSize: '2rem', marginTop: '0.25rem' }}>{value}</h3>
+                  <h3 style={{ fontSize: '2rem', marginTop: '0.25rem' }}>
+                    <AnimatedCounter value={value} prefix={prefix} decimals={decimals} duration={1} />
+                  </h3>
                 </div>
               </div>
             ))}

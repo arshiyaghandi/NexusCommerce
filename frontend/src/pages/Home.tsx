@@ -7,6 +7,9 @@ import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import PageTransition, { staggerItem, staggerContainer } from '../components/PageTransition';
+import TiltCard from '../components/TiltCard';
+import MouseSpotlight from '../components/MouseSpotlight';
+import { ProductGridSkeleton } from '../components/Skeleton';
 
 /* ── Animation variants ──────────────────────────────────────────── */
 const heroTextVariants = {
@@ -221,51 +224,48 @@ export default function Home() {
           </Link>
         </motion.div>
         {isLoading ? (
-          <div className="text-center text-muted" style={{ padding: '3rem' }}>Loading products...</div>
+          <ProductGridSkeleton count={3} />
         ) : featuredProducts.length > 0 ? (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '2rem' }}>
             {featuredProducts.map((product, i) => (
-              <motion.div
-                key={product.id}
-                className="glass glass-card"
-                style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}
-                variants={staggerItem}
-                initial="initial"
-                whileInView="animate"
-                viewport={{ once: true }}
-                whileHover="hover"
-                custom={i}
-              >
-                <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                  <motion.div
-                    style={{ height: '150px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}
-                    variants={cardHover}
-                  >
+              <TiltCard key={product.id} maxTilt={6}>
+                <MouseSpotlight
+                  className="glass glass-card"
+                  style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}
+                >
+                  <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
                     <motion.div
-                      style={{ position: 'absolute', width: '100px', height: '100px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.5 }}
-                      variants={floatingOrb}
-                      animate="animate"
-                    />
-                  </motion.div>
-                  <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{product.name}</h3>
-                  <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem' }}>
-                    {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
-                  </p>
-                </Link>
-                <div className="flex-between" style={{ marginTop: 'auto' }}>
-                  <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
-                    ${product.price}
-                  </span>
-                  <motion.button
-                    className="btn btn-primary"
-                    onClick={() => handleAddToCart(product)}
-                    whileHover={{ scale: 1.08 }}
-                    whileTap={{ scale: 0.95 }}
-                  >
-                    <ShoppingCart size={16} /> Add
-                  </motion.button>
-                </div>
-              </motion.div>
+                      style={{ height: '150px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}
+                      variants={cardHover}
+                      initial="rest"
+                      whileHover="hover"
+                    >
+                      <motion.div
+                        style={{ position: 'absolute', width: '100px', height: '100px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(30px)', opacity: 0.5 }}
+                        variants={floatingOrb}
+                        animate="animate"
+                      />
+                    </motion.div>
+                    <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>{product.name}</h3>
+                    <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem' }}>
+                      {product.description?.length > 60 ? product.description.substring(0, 60) + '...' : product.description}
+                    </p>
+                  </Link>
+                  <div className="flex-between" style={{ marginTop: 'auto' }}>
+                    <span style={{ fontSize: '1.25rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
+                      ${product.price}
+                    </span>
+                    <motion.button
+                      className="btn btn-primary"
+                      onClick={() => handleAddToCart(product)}
+                      whileHover={{ scale: 1.08 }}
+                      whileTap={{ scale: 0.95 }}
+                    >
+                      <ShoppingCart size={16} /> Add
+                    </motion.button>
+                  </div>
+                </MouseSpotlight>
+              </TiltCard>
             ))}
           </div>
         ) : (

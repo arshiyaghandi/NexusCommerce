@@ -7,7 +7,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
-  refreshUser: () => void;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -16,23 +16,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = useCallback(() => {
-    const u = checkAuthFn();
-    setUser(u);
-    setLoading(false);
+  const refreshUser = useCallback(async () => {
+    try {
+      const u = await checkAuthFn();
+      setUser(u);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
     refreshUser();
+    
+    const handleLogoutEvent = () => {
+      setUser(null);
+    };
+    window.addEventListener('nexus-logout', handleLogoutEvent);
+    
+    return () => {
+      window.removeEventListener('nexus-logout', handleLogoutEvent);
+    };
   }, [refreshUser]);
 
   const login = useCallback(async (username: string, password: string) => {
     await loginFn(username, password);
-    refreshUser();
+    await refreshUser();
   }, [refreshUser]);
 
   const logout = useCallback(() => {
     logoutFn();
+    setUser(null);
   }, []);
 
   return (

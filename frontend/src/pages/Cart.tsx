@@ -3,6 +3,8 @@ import { Trash2, CreditCard, ShoppingBag } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useCart } from '../hooks/useCart';
 import PageTransition from '../components/PageTransition';
+import { CartSkeleton } from '../components/Skeleton';
+import AnimatedCounter from '../components/AnimatedCounter';
 
 const itemVariants = {
   initial: { opacity: 0, x: -30, height: 0, marginBottom: 0 },
@@ -26,7 +28,12 @@ export default function Cart() {
   const navigate = useNavigate();
   const { items, isLoading, addItem, removeItem, clearCart } = useCart();
 
-  if (isLoading) return <div className="text-center mt-4 text-muted">Loading cart...</div>;
+  if (isLoading) return (
+    <PageTransition>
+      <h2 style={{ marginBottom: '2rem' }}>Your Cart</h2>
+      <CartSkeleton count={2} />
+    </PageTransition>
+  );
 
   const total = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
 
@@ -167,7 +174,7 @@ export default function Cart() {
               <h3 style={{ marginBottom: '1.5rem', borderBottom: '1px solid var(--glass-border)', paddingBottom: '1rem' }}>Order Summary</h3>
               <div className="flex-between" style={{ marginBottom: '1rem' }}>
                 <span className="text-muted">Subtotal</span>
-                <span>${total.toFixed(2)}</span>
+                <AnimatedCounter value={total} prefix="$" decimals={2} duration={0.8} />
               </div>
               <div className="flex-between" style={{ marginBottom: '1.5rem' }}>
                 <span className="text-muted">Tax (0%)</span>
@@ -182,7 +189,7 @@ export default function Cart() {
                   animate={{ scale: 1 }}
                   transition={{ type: 'spring', stiffness: 300 }}
                 >
-                  ${total.toFixed(2)}
+                  <AnimatedCounter value={total} prefix="$" decimals={2} duration={0.8} />
                 </motion.span>
               </div>
               <motion.button

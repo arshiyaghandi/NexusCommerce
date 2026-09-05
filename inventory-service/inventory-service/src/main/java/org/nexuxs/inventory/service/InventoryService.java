@@ -183,7 +183,7 @@ public class InventoryService {
         ProcessedCompensation marker = ProcessedCompensation.builder()
                 .orderId(orderId)
                 .productId(productId)
-                .processedAt(LocalDateTime.now())
+                .processedAt(Instant.now())
                 .build();
 
         return entityTemplate.insert(ProcessedCompensation.class).using(marker)

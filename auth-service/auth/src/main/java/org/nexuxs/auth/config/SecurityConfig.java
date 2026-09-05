@@ -23,7 +23,7 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .authorizeExchange(exchanges -> exchanges
-                        .pathMatchers("/api/auth/register", "/api/auth/captcha").permitAll()
+                        .pathMatchers("/api/auth/register", "/api/auth/captcha", "/api/auth/login", "/api/auth/logout").permitAll()
                         .pathMatchers(
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
@@ -34,7 +34,8 @@ public class SecurityConfig {
                         .pathMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyExchange().authenticated()
                 )
-                .oauth2Login(Customizer.withDefaults());
+                .oauth2Login(Customizer.withDefaults())
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()));
 
         return http.build();
     }

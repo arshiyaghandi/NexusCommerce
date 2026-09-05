@@ -8,6 +8,9 @@ import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import PageTransition, { staggerItem, staggerContainer } from '../components/PageTransition';
+import TiltCard from '../components/TiltCard';
+import MouseSpotlight from '../components/MouseSpotlight';
+import { ProductGridSkeleton } from '../components/Skeleton';
 
 export default function Products() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -211,7 +214,9 @@ export default function Products() {
 
           {/* Product Grid */}
           {productsLoading ? (
-            <div className="text-center mt-4 text-muted" style={{ padding: '3rem' }}>Loading products...</div>
+            <div style={{ marginTop: '2rem' }}>
+              <ProductGridSkeleton count={6} />
+            </div>
           ) : (
             <AnimatePresence mode="wait">
               <motion.div
@@ -223,51 +228,52 @@ export default function Products() {
                 style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: '1.5rem' }}
               >
                 {products?.map((product) => (
-                  <motion.div
-                    key={product.id}
-                    className="glass glass-card"
-                    style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column' }}
-                    variants={staggerItem}
-                    whileHover={{ y: -6, scale: 1.02, transition: { duration: 0.2 } }}
-                  >
-                    <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                      {/* Product image placeholder */}
-                      <div style={{ height: '140px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', width: '90px', height: '90px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(28px)', opacity: 0.45 }} />
-                      </div>
-
-                      {/* Category badge */}
-                      {product.categoryName && (
-                        <span style={{
-                          display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
-                          fontSize: '0.72rem', fontWeight: '500', padding: '0.2rem 0.6rem',
-                          borderRadius: '20px', marginBottom: '0.5rem',
-                          background: 'rgba(99,102,241,0.15)', color: 'var(--accent-primary)',
-                          border: '1px solid rgba(99,102,241,0.25)',
-                        }}>
-                          <Tag size={10} />
-                          {product.categoryName}
-                        </span>
-                      )}
-
-                      <h3 style={{ fontSize: '1.1rem', marginBottom: '0.4rem' }}>{product.name}</h3>
-                      <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem', fontSize: '0.88rem' }}>
-                        {product.description?.length > 65 ? product.description.substring(0, 65) + '...' : product.description}
-                      </p>
-                    </Link>
-                    <div className="flex-between" style={{ marginTop: 'auto' }}>
-                      <span style={{ fontSize: '1.2rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
-                        ${product.price}
-                      </span>
-                      <motion.button
-                        className="btn btn-primary"
-                        onClick={() => handleAddToCart(product)}
-                        style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
-                        whileTap={{ scale: 0.95 }}
+                  <motion.div key={product.id} variants={staggerItem}>
+                    <TiltCard maxTilt={5}>
+                      <MouseSpotlight
+                        className="glass glass-card"
+                        style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', height: '100%' }}
                       >
-                        <ShoppingCart size={14} /> Add
-                      </motion.button>
-                    </div>
+                        <Link to={`/products/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+                          {/* Product image placeholder */}
+                          <div style={{ height: '140px', background: 'var(--bg-darker)', borderRadius: '10px', marginBottom: '1rem', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                            <div style={{ position: 'absolute', width: '90px', height: '90px', background: 'var(--accent-gradient)', borderRadius: '50%', filter: 'blur(28px)', opacity: 0.45 }} />
+                          </div>
+
+                          {/* Category badge */}
+                          {product.categoryName && (
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '0.3rem',
+                              fontSize: '0.72rem', fontWeight: '500', padding: '0.2rem 0.6rem',
+                              borderRadius: '20px', marginBottom: '0.5rem',
+                              background: 'rgba(99,102,241,0.15)', color: 'var(--accent-primary)',
+                              border: '1px solid rgba(99,102,241,0.25)',
+                            }}>
+                              <Tag size={10} />
+                              {product.categoryName}
+                            </span>
+                          )}
+
+                          <h3 style={{ fontSize: '1.1rem', marginBottom: '0.4rem' }}>{product.name}</h3>
+                          <p className="text-muted" style={{ flexGrow: 1, marginBottom: '1rem', fontSize: '0.88rem' }}>
+                            {product.description?.length > 65 ? product.description.substring(0, 65) + '...' : product.description}
+                          </p>
+                        </Link>
+                        <div className="flex-between" style={{ marginTop: 'auto' }}>
+                          <span style={{ fontSize: '1.2rem', fontWeight: '600', color: 'var(--accent-primary)' }}>
+                            ${product.price}
+                          </span>
+                          <motion.button
+                            className="btn btn-primary"
+                            onClick={() => handleAddToCart(product)}
+                            style={{ fontSize: '0.85rem', padding: '0.45rem 0.9rem' }}
+                            whileTap={{ scale: 0.95 }}
+                          >
+                            <ShoppingCart size={14} /> Add
+                          </motion.button>
+                        </div>
+                      </MouseSpotlight>
+                    </TiltCard>
                   </motion.div>
                 ))}
                 {products && products.length === 0 && (

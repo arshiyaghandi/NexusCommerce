@@ -9,24 +9,26 @@ import org.keycloak.admin.client.KeycloakBuilder;
 import org.keycloak.representations.idm.CredentialRepresentation;
 import org.keycloak.representations.idm.RoleRepresentation;
 import org.keycloak.representations.idm.UserRepresentation;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.server.reactive.ServerHttpResponse;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.security.oauth2.core.oidc.user.OidcUser;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.reactive.function.BodyInserters;
+import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.net.URI;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 
 @Slf4j
@@ -35,61 +37,86 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class AuthController {
 
-    private static final String USER_CACHE_PREFIX = "auth:user:";
     private static final String CAPTCHA_KEY_PREFIX = "captcha:";
-    private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
     private final ReactiveStringRedisTemplate redisTemplate;
-    private final ObjectMapper objectMapper;
 
-    @GetMapping("/success")
-    public Mono<Void> loginSuccess(@AuthenticationPrincipal OidcUser oidcUser, ServerHttpResponse response) {
-        if (oidcUser != null) {
-            ResponseCookie cookie = ResponseCookie.from("NEXUS_TOKEN", oidcUser.getIdToken().getTokenValue())
-                    .httpOnly(true)
-                    .secure(false)
-                    .path("/")
-                    .maxAge(3600)
-                    .sameSite("Lax")
-                    .build();
-            response.addCookie(cookie);
-        }
-        response.setStatusCode(HttpStatus.FOUND); /*status 302 redirect to front */
-        response.getHeaders().setLocation(URI.create("http://localhost:3000"));
-        return response.setComplete();
+    @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
+    private String clientId;
+
+    @Value("${spring.security.oauth2.client.registration.keycloak.client-secret}")
+    private String clientSecret;
+
+    @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
+    private String issuerUri;
+
+    @PostMapping("/login")
+    public Mono<ResponseEntity<Map<String, String>>> login(@RequestBody LoginRequest request) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "password");
+        formData.add("client_id", clientId);
+        formData.add("client_secret", clientSecret);
+        formData.add("username", request.getUsername());
+        formData.add("password", request.getPassword());
+
+        return WebClient.create().post()
+                .uri(issuerUri + "/protocol/openid-connect/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(formData))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .map(responseBody -> {
+                    String accessToken = (String) responseBody.get("access_token");
+                    String refreshToken = (String) responseBody.get("refresh_token");
+
+                    ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", accessToken)
+                            .httpOnly(true).secure(false).path("/").maxAge(3600).sameSite("Lax").build();
+
+                    ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", refreshToken)
+                            .httpOnly(true).secure(false).path("/").maxAge(86400).sameSite("Lax").build();
+
+                    return ResponseEntity.ok()
+                            .header("Set-Cookie", tokenCookie.toString())
+                            .header("Set-Cookie", refreshCookie.toString())
+                            .body(Map.of("message", "Login successful"));
+                })
+                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"))));
+    }
+
+    @PostMapping("/logout")
+    public Mono<ResponseEntity<Map<String, String>>> logout() {
+        ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", "")
+                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+
+        ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", "")
+                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+
+        return Mono.just(ResponseEntity.ok()
+                .header("Set-Cookie", tokenCookie.toString())
+                .header("Set-Cookie", refreshCookie.toString())
+                .body(Map.of("message", "Logout successful")));
     }
 
     @GetMapping("/me")
-    public Mono<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal OidcUser oidcUser) {
-        if (oidcUser == null) {
+    public Mono<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
+        if (jwt == null) {
             return Mono.just(Map.of("error", "User not authenticated"));
         }
-        String userId = oidcUser.getSubject();
-        String cacheKey = USER_CACHE_PREFIX + userId;
-        return redisTemplate.opsForValue().get(cacheKey)
-                .flatMap(json -> {
-                    try {
-                         @SuppressWarnings("unchecked")
-                        Map<String, Object> cached = objectMapper.readValue(json, Map.class);
-                        return Mono.just(cached);
-                    } catch (Exception e) {
-                        return Mono.error(e);
-                    }
-                })
-                .switchIfEmpty(Mono.defer(() -> {
-                    Map<String, Object> profile = Map.of(
-                            "name", oidcUser.getFullName() != null ? oidcUser.getFullName() : oidcUser.getPreferredUsername(),
-                            "email", oidcUser.getEmail() != null ? oidcUser.getEmail() : "No Email",
-                            "roles", oidcUser.getAuthorities()
-                    );
-                    try {
-                        String json = objectMapper.writeValueAsString(profile);
-                        return redisTemplate.opsForValue().set(cacheKey, json, CACHE_TTL)
-                                .thenReturn(profile);
-                    } catch (Exception e) {
-                        return Mono.just(profile);
-                    }
-                }));
+
+        Map<String, Object> realmAccess = jwt.getClaim("realm_access");
+        List<String> roles = new ArrayList<>();
+        if (realmAccess != null && realmAccess.containsKey("roles")) {
+            List<String> kRoles = (List<String>) realmAccess.get("roles");
+            for (String r : kRoles) {
+                roles.add("ROLE_" + r.toUpperCase());
+            }
+        }
+
+        return Mono.just(Map.of(
+                "name", jwt.getClaimAsString("name") != null ? jwt.getClaimAsString("name") : jwt.getClaimAsString("preferred_username"),
+                "email", jwt.getClaimAsString("email") != null ? jwt.getClaimAsString("email") : "No Email",
+                "roles", roles
+        ));
     }
 
     @PostMapping("/register")

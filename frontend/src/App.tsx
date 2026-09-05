@@ -1,7 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AuthProvider } from './contexts/AuthContext';
 import { ToastProvider } from './contexts/ToastContext';
 import Layout from './components/Layout';
@@ -30,7 +30,17 @@ const queryClient = new QueryClient({
 
 function PageLoader() {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '40vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', minHeight: '40vh', gap: '1.5rem' }}>
+      <motion.div
+        animate={{ scale: [1, 1.1, 1], opacity: [0.7, 1, 0.7] }}
+        transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
+      >
+        <img
+          src="/logo.jpg"
+          alt="Loading..."
+          style={{ width: '56px', height: '56px', borderRadius: '50%', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.1)' }}
+        />
+      </motion.div>
       <div className="page-loader">
         <div className="page-loader-ring" />
       </div>
