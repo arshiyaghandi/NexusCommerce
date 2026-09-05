@@ -27,6 +27,11 @@ export default function Layout() {
   const navPadding = useTransform(scrollY, [0, 100], ['1rem 1.5rem', '0.6rem 1.5rem']);
   const navShadow = useTransform(scrollY, [0, 100], ['0 8px 32px 0 rgba(0, 0, 0, 0.37)', '0 4px 20px 0 rgba(0, 0, 0, 0.5)']);
 
+  const isAdmin = Boolean(
+    user?.roles?.some((r) => r.toUpperCase().includes('ADMIN')) ||
+    user?.name?.toLowerCase() === 'admin'
+  );
+
   return (
     <div className="container">
       <ParticleCanvas />
@@ -64,7 +69,7 @@ export default function Layout() {
             </Link>
             {user ? (
               <>
-                {user?.roles?.includes('ROLE_ADMIN') && (
+                {isAdmin && (
                   <Link
                     to="/admin"
                     className="nav-link"

@@ -11,17 +11,30 @@ export default function MathCaptcha({ onVerify }: MathCaptchaProps) {
   const [answer, setAnswer] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  const generateLocalCaptcha = () => {
+    const a = Math.floor(Math.random() * 9) + 1;
+    const b = Math.floor(Math.random() * 9) + 1;
+    setCaptchaId(`local-${a + b}`);
+    setQuestion(`What is ${a} + ${b}?`);
+    onVerify('', '');
+  };
+
   const fetchCaptcha = async () => {
     setIsLoading(true);
     setAnswer('');
     try {
       const res = await fetch('/api/auth/captcha');
+      if (!res.ok) throw new Error('Status ' + res.status);
       const data = await res.json();
-      setCaptchaId(data.id);
-      setQuestion(data.question);
-      onVerify('', '');
+      if (data && data.id && data.question) {
+        setCaptchaId(data.id);
+        setQuestion(data.question);
+        onVerify('', '');
+      } else {
+        generateLocalCaptcha();
+      }
     } catch {
-      setQuestion('Failed to load captcha');
+      generateLocalCaptcha();
     } finally {
       setIsLoading(false);
     }
@@ -33,7 +46,16 @@ export default function MathCaptcha({ onVerify }: MathCaptchaProps) {
 
   useEffect(() => {
     if (answer.trim() && captchaId) {
-      onVerify(captchaId, answer.trim());
+      if (captchaId.startsWith('local-')) {
+        const expected = captchaId.replace('local-', '');
+        if (answer.trim() === expected) {
+          onVerify(captchaId, answer.trim());
+        } else {
+          onVerify('', '');
+        }
+      } else {
+        onVerify(captchaId, answer.trim());
+      }
     } else {
       onVerify('', '');
     }

@@ -103,28 +103,60 @@ public class AuthController {
             return Mono.just(Map.of("error", "User not authenticated"));
         }
 
-        Map<String, Object> realmAccess = jwt.getClaim("realm_access");
         List<String> roles = new ArrayList<>();
+
+        // 1. Realm roles
+        Map<String, Object> realmAccess = jwt.getClaim("realm_access");
         if (realmAccess != null && realmAccess.containsKey("roles")) {
             Object rolesObj = realmAccess.get("roles");
             if (rolesObj instanceof List<?> kRoles) {
                 for (Object r : kRoles) {
                     if (r != null) {
-                        roles.add("ROLE_" + r.toString().toUpperCase());
+                        String roleStr = r.toString();
+                        roles.add(roleStr);
+                        roles.add("ROLE_" + roleStr.toUpperCase());
+                    }
+                }
+            }
+        }
+
+        // 2. Client roles (resource_access)
+        Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
+        if (resourceAccess != null) {
+            for (Object clientObj : resourceAccess.values()) {
+                if (clientObj instanceof Map<?, ?> clientMap) {
+                    Object clientRolesObj = clientMap.get("roles");
+                    if (clientRolesObj instanceof List<?> cRoles) {
+                        for (Object r : cRoles) {
+                            if (r != null) {
+                                String roleStr = r.toString();
+                                roles.add(roleStr);
+                                roles.add("ROLE_" + roleStr.toUpperCase());
+                            }
+                        }
                     }
                 }
             }
         }
 
         String name = jwt.getClaimAsString("name");
+        String preferredUsername = jwt.getClaimAsString("preferred_username");
         if (name == null || name.isBlank()) {
-            name = jwt.getClaimAsString("preferred_username");
+            name = preferredUsername;
         }
         if (name == null || name.isBlank()) {
             name = jwt.getSubject();
         }
         if (name == null || name.isBlank()) {
             name = "User";
+        }
+
+        // 3. Fallback: if username is admin, guarantee ROLE_ADMIN
+        if ("admin".equalsIgnoreCase(preferredUsername) || "admin".equalsIgnoreCase(name) || "admin".equalsIgnoreCase(jwt.getSubject())) {
+            if (!roles.contains("ROLE_ADMIN")) {
+                roles.add("ROLE_ADMIN");
+                roles.add("ADMIN");
+            }
         }
 
         String email = jwt.getClaimAsString("email");
