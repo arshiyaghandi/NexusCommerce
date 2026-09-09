@@ -26,6 +26,17 @@ spring:
         jwt:
           issuer-uri: http://localhost:8081/realms/nexus-realm
 
+# ── Keycloak admin client settings ───────────────────────────────────────────
+# Credentials injected via environment variables in production.
+# Defaults are for local dev only — NEVER commit real passwords here.
+nexus:
+  keycloak:
+    server-url: ${KEYCLOAK_URL:http://localhost:8081}
+    realm: ${KEYCLOAK_REALM:nexus-realm}
+    admin:
+      username: ${KEYCLOAK_ADMIN_USERNAME:admin}
+      password: ${KEYCLOAK_ADMIN_PASSWORD:admin}
+
 eureka:
   client:
     register-with-eureka: true

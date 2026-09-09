@@ -1,5 +1,9 @@
 package org.nexuxs.order.api;
 
+import org.nexuxs.order.exception.AuthenticationMissingException;
+import org.nexuxs.order.exception.EmptyCartException;
+import org.nexuxs.order.exception.KafkaUnavailableException;
+import org.nexuxs.order.exception.OrderNotFoundException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -18,18 +22,28 @@ public class GlobalExceptionHandler {
                 .body(buildBody(ex.getStatusCode().value(), ex.getReason())));
     }
 
-    @ExceptionHandler(IllegalStateException.class)
-    public Mono<ResponseEntity<Map<String, Object>>> handleIllegalState(IllegalStateException ex) {
-        if (ex.getMessage() != null && ex.getMessage().contains("Order not found")) {
-            return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(buildBody(HttpStatus.NOT_FOUND.value(), ex.getMessage())));
-        }
-        if (ex.getMessage() != null && ex.getMessage().contains("Missing authentication")) {
-            return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(buildBody(HttpStatus.FORBIDDEN.value(), ex.getMessage())));
-        }
+    @ExceptionHandler(OrderNotFoundException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleOrderNotFound(OrderNotFoundException ex) {
+        return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildBody(HttpStatus.NOT_FOUND.value(), ex.getMessage())));
+    }
+
+    @ExceptionHandler(EmptyCartException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleEmptyCart(EmptyCartException ex) {
         return Mono.just(ResponseEntity.badRequest()
                 .body(buildBody(HttpStatus.BAD_REQUEST.value(), ex.getMessage())));
+    }
+
+    @ExceptionHandler(AuthenticationMissingException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleAuthMissing(AuthenticationMissingException ex) {
+        return Mono.just(ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(buildBody(HttpStatus.FORBIDDEN.value(), ex.getMessage())));
+    }
+
+    @ExceptionHandler(KafkaUnavailableException.class)
+    public Mono<ResponseEntity<Map<String, Object>>> handleKafkaUnavailable(KafkaUnavailableException ex) {
+        return Mono.just(ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(buildBody(HttpStatus.SERVICE_UNAVAILABLE.value(), ex.getMessage())));
     }
 
     @ExceptionHandler(Exception.class)
@@ -39,6 +53,6 @@ public class GlobalExceptionHandler {
     }
 
     private Map<String, Object> buildBody(int status, String message) {
-        return Map.of("status", status, "message", message);
+        return Map.of("status", status, "message", message != null ? message : "Unknown error");
     }
 }

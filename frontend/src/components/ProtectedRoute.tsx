@@ -39,8 +39,10 @@ export function AdminRoute() {
   }
 
   const isAdmin = Boolean(
-    user?.roles?.some((r) => r.toUpperCase().includes('ADMIN')) ||
-    user?.name?.toLowerCase() === 'admin'
+    user?.roles?.some((r) => {
+      const normalized = r.toUpperCase();
+      return normalized === 'ADMIN' || normalized === 'ROLE_ADMIN';
+    })
   );
 
   if (!isAdmin) {

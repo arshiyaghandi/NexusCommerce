@@ -6,9 +6,26 @@ export interface RecommendationResponse {
   reason: string;
 }
 
-export async function getRecommendations(userId?: string): Promise<RecommendationResponse[]> {
+export type InteractionType = 'view' | 'cart' | 'purchase';
+
+/** دریافت توصیه‌های شخصی‌سازی‌شده */
+export async function getRecommendations(topN = 10): Promise<RecommendationResponse[]> {
   const response = await api.get<RecommendationResponse[]>('/recommendations', {
-    params: userId ? { userId } : undefined,
+    params: { topN },
   });
   return response.data;
+}
+
+/**
+ * ثبت تعامل کاربر با یک محصول.
+ * userId از JWT cookie در سمت backend استخراج می‌شه — اینجا نمی‌فرستیم.
+ */
+export async function trackInteraction(
+  productId: number,
+  interactionType: InteractionType,
+): Promise<void> {
+  await api.post('/recommendations/track', {
+    productId,
+    interactionType,
+  });
 }

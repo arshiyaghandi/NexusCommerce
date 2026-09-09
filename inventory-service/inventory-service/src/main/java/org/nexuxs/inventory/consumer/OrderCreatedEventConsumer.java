@@ -8,12 +8,14 @@ import org.nexuxs.messaging.contracts.event.OrderCreatedEvent;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-
-import java.time.Duration;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * Entry point for the inventory portion of the checkout Saga.
  * Listens for new orders and attempts to reserve stock.
+ *
+ * <p>The reactive chain is subscribed on {@code boundedElastic} to avoid blocking
+ * Kafka's listener thread — never call {@code block()} inside a {@code @KafkaListener}.
  */
 @Slf4j
 @Component
@@ -32,11 +34,9 @@ public class OrderCreatedEventConsumer {
         log.info("[inventory] order.created | orderId={} userId={} items={}",
                 event.orderId(), event.userId(), event.items() != null ? event.items().size() : 0);
 
-        try {
-            inventoryService.handleOrderCreated(event).block(Duration.ofSeconds(30));
-        } catch (Exception e) {
-            log.error("[inventory] failed to handle order.created for orderId={}", event.orderId(), e);
-            throw e;
-        }
+        inventoryService.handleOrderCreated(event)
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnError(e -> log.error("[inventory] failed to handle order.created for orderId={}", event.orderId(), e))
+                .subscribe();
     }
 }

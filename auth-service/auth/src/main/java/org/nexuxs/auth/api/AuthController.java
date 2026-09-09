@@ -25,12 +25,25 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Authentication controller: login, logout, register, /me.
+ *
+ * <p><strong>Security notes:</strong>
+ * <ul>
+ *   <li>ROLE_ADMIN is granted ONLY when Keycloak's {@code realm_access.roles} contains "admin".
+ *       There is intentionally NO username-based fallback — that was a privilege escalation
+ *       vulnerability where any user named "admin" received admin rights.</li>
+ *   <li>Keycloak admin credentials are injected via environment variables
+ *       ({@code KEYCLOAK_ADMIN_USERNAME}, {@code KEYCLOAK_ADMIN_PASSWORD}) — never hardcoded.</li>
+ *   <li>Logout revokes the refresh token at Keycloak so the server-side session is invalidated,
+ *       not just the browser cookie.</li>
+ * </ul>
+ */
 @Slf4j
 @RestController
 @RequestMapping("/api/auth")
@@ -41,6 +54,7 @@ public class AuthController {
 
     private final ReactiveStringRedisTemplate redisTemplate;
 
+    // ── Keycloak client config (OAuth2 token endpoint) ────────────────────────
     @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
     private String clientId;
 
@@ -49,6 +63,23 @@ public class AuthController {
 
     @Value("${spring.security.oauth2.client.provider.keycloak.issuer-uri}")
     private String issuerUri;
+
+    // ── Keycloak Admin client config (user registration) ──────────────────────
+    @Value("${nexus.keycloak.server-url:http://localhost:8081}")
+    private String keycloakServerUrl;
+
+    @Value("${nexus.keycloak.realm:nexus-realm}")
+    private String keycloakRealm;
+
+    @Value("${nexus.keycloak.admin.username:${KEYCLOAK_ADMIN_USERNAME:admin}}")
+    private String keycloakAdminUsername;
+
+    @Value("${nexus.keycloak.admin.password:${KEYCLOAK_ADMIN_PASSWORD:admin}}")
+    private String keycloakAdminPassword;
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Login
+    // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/login")
     public Mono<ResponseEntity<Map<String, String>>> login(@RequestBody LoginRequest request) {
@@ -66,12 +97,11 @@ public class AuthController {
                 .retrieve()
                 .bodyToMono(Map.class)
                 .map(responseBody -> {
-                    String accessToken = (String) responseBody.get("access_token");
+                    String accessToken  = (String) responseBody.get("access_token");
                     String refreshToken = (String) responseBody.get("refresh_token");
 
                     ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", accessToken)
                             .httpOnly(true).secure(false).path("/").maxAge(3600).sameSite("Lax").build();
-
                     ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", refreshToken)
                             .httpOnly(true).secure(false).path("/").maxAge(86400).sameSite("Lax").build();
 
@@ -80,22 +110,59 @@ public class AuthController {
                             .header("Set-Cookie", refreshCookie.toString())
                             .body(Map.of("message", "Login successful"));
                 })
-                .onErrorResume(e -> Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"))));
+                .onErrorResume(e -> {
+                    log.warn("Login failed: {}", e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                            .body(Map.of("error", "Invalid credentials")));
+                });
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Logout — revokes the refresh token at Keycloak, then expires cookies
+    // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/logout")
-    public Mono<ResponseEntity<Map<String, String>>> logout() {
-        ResponseCookie tokenCookie = ResponseCookie.from("NEXUS_TOKEN", "")
+    public Mono<ResponseEntity<Map<String, String>>> logout(
+            @CookieValue(value = "NEXUS_REFRESH_TOKEN", required = false) String refreshToken) {
+
+        // 1. Revoke refresh token at Keycloak (invalidates the server-side session).
+        //    If no refresh token cookie is present we still clear the cookies.
+        Mono<Void> revoke = Mono.empty();
+        if (refreshToken != null && !refreshToken.isBlank()) {
+            MultiValueMap<String, String> revokeForm = new LinkedMultiValueMap<>();
+            revokeForm.add("client_id", clientId);
+            revokeForm.add("client_secret", clientSecret);
+            revokeForm.add("refresh_token", refreshToken);
+
+            revoke = WebClient.create().post()
+                    .uri(issuerUri + "/protocol/openid-connect/logout")
+                    .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                    .body(BodyInserters.fromFormData(revokeForm))
+                    .retrieve()
+                    .toBodilessEntity()
+                    .doOnSuccess(r -> log.info("Keycloak session revoked, status={}", r.getStatusCode()))
+                    .doOnError(e -> log.warn("Failed to revoke Keycloak session: {}", e.getMessage()))
+                    .onErrorResume(e -> Mono.empty())
+                    .then();
+        }
+
+        // 2. Expire both cookies regardless of revocation outcome.
+        ResponseCookie expiredToken = ResponseCookie.from("NEXUS_TOKEN", "")
+                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
+        ResponseCookie expiredRefresh = ResponseCookie.from("NEXUS_REFRESH_TOKEN", "")
                 .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
 
-        ResponseCookie refreshCookie = ResponseCookie.from("NEXUS_REFRESH_TOKEN", "")
-                .httpOnly(true).secure(false).path("/").maxAge(0).sameSite("Lax").build();
-
-        return Mono.just(ResponseEntity.ok()
-                .header("Set-Cookie", tokenCookie.toString())
-                .header("Set-Cookie", refreshCookie.toString())
-                .body(Map.of("message", "Logout successful")));
+        return revoke.then(Mono.just(
+                ResponseEntity.ok()
+                        .header("Set-Cookie", expiredToken.toString())
+                        .header("Set-Cookie", expiredRefresh.toString())
+                        .body(Map.of("message", "Logout successful"))
+        ));
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // /me — returns the authenticated user's profile and roles from JWT
+    // ─────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/me")
     public Mono<Map<String, Object>> getCurrentUser(@AuthenticationPrincipal Jwt jwt) {
@@ -105,7 +172,7 @@ public class AuthController {
 
         List<String> roles = new ArrayList<>();
 
-        // 1. Realm roles
+        // 1. Realm roles from Keycloak JWT claim
         Map<String, Object> realmAccess = jwt.getClaim("realm_access");
         if (realmAccess != null && realmAccess.containsKey("roles")) {
             Object rolesObj = realmAccess.get("roles");
@@ -139,38 +206,29 @@ public class AuthController {
             }
         }
 
+        // ⛔ NO username-based fallback — roles come exclusively from Keycloak claims.
+
         String name = jwt.getClaimAsString("name");
         String preferredUsername = jwt.getClaimAsString("preferred_username");
-        if (name == null || name.isBlank()) {
-            name = preferredUsername;
-        }
-        if (name == null || name.isBlank()) {
-            name = jwt.getSubject();
-        }
-        if (name == null || name.isBlank()) {
-            name = "User";
-        }
-
-        // 3. Fallback: if username is admin, guarantee ROLE_ADMIN
-        if ("admin".equalsIgnoreCase(preferredUsername) || "admin".equalsIgnoreCase(name) || "admin".equalsIgnoreCase(jwt.getSubject())) {
-            if (!roles.contains("ROLE_ADMIN")) {
-                roles.add("ROLE_ADMIN");
-                roles.add("ADMIN");
-            }
-        }
+        if (name == null || name.isBlank()) name = preferredUsername;
+        if (name == null || name.isBlank()) name = jwt.getSubject();
+        if (name == null || name.isBlank()) name = "User";
 
         String email = jwt.getClaimAsString("email");
-        if (email == null || email.isBlank()) {
-            email = "No Email";
-        }
+        if (email == null || email.isBlank()) email = "No Email";
 
         Map<String, Object> response = new java.util.HashMap<>();
         response.put("name", name);
         response.put("email", email);
         response.put("roles", roles);
+        response.put("sub", jwt.getSubject());
 
         return Mono.just(response);
     }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Register
+    // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
     public Mono<ResponseEntity<Map<String, String>>> register(@RequestBody RegisterRequest request) {
@@ -195,12 +253,13 @@ public class AuthController {
 
     private Mono<ResponseEntity<Map<String, String>>> registerUser(RegisterRequest request) {
         return Mono.fromCallable(() -> {
+            // Credentials come from environment variables — NEVER hardcoded.
             try (Keycloak keycloak = KeycloakBuilder.builder()
-                    .serverUrl("http://localhost:8081")
+                    .serverUrl(keycloakServerUrl)
                     .realm("master")
                     .clientId("admin-cli")
-                    .username("admin")
-                    .password("admin")
+                    .username(keycloakAdminUsername)
+                    .password(keycloakAdminPassword)
                     .build()) {
 
                 UserRepresentation user = new UserRepresentation();
@@ -224,13 +283,13 @@ public class AuthController {
                 cred.setTemporary(false);
                 user.setCredentials(Collections.singletonList(cred));
 
-                Response response = keycloak.realm("nexus-realm").users().create(user);
+                Response response = keycloak.realm(keycloakRealm).users().create(user);
 
                 if (response.getStatus() == 201) {
                     String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
                     try {
-                        RoleRepresentation userRole = keycloak.realm("nexus-realm").roles().get("user").toRepresentation();
-                        keycloak.realm("nexus-realm").users().get(userId).roles().realmLevel().add(Collections.singletonList(userRole));
+                        RoleRepresentation userRole = keycloak.realm(keycloakRealm).roles().get("user").toRepresentation();
+                        keycloak.realm(keycloakRealm).users().get(userId).roles().realmLevel().add(Collections.singletonList(userRole));
                     } catch (Exception roleEx) {
                         log.warn("User created but role assignment failed: {}", roleEx.getMessage());
                     }

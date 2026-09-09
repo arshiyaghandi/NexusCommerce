@@ -1,7 +1,13 @@
 Django==5.0.4
 djangorestframework==3.15.1
 py_eureka_client==0.13.3
+
+# ── ML & Data ─────────────────────────────────────────────────────────────────
 scikit-learn==1.4.2
 pandas==2.2.2
-httpx==0.27.0
+numpy==1.26.4
+scipy==1.13.0         # SVD sparse matrix decomposition
 
+# ── HTTP & Auth ───────────────────────────────────────────────────────────────
+httpx==0.27.0         # async-capable HTTP client برای fetch از product-service
+PyJWT==2.8.0          # decode کردن JWT برای استخراج user_id

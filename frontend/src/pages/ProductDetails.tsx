@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { ShoppingCart, ArrowLeft, ShieldCheck, Truck, PackageX, PackageCheck } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -7,10 +7,12 @@ import { useInventory } from '../hooks/useInventory';
 import { useCart } from '../hooks/useCart';
 import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
+import { useTrackInteraction } from '../hooks/useRecommendations';
 import PageTransition from '../components/PageTransition';
 import ProductVisual from '../components/ProductVisual';
 import AnimatedCounter from '../components/AnimatedCounter';
 import TiltCard from '../components/TiltCard';
+
 
 /* ── animation variants ────────────────────────────────────────── */
 const infoContainer = {
@@ -56,11 +58,18 @@ export default function ProductDetails() {
   const { addItem } = useCart(!!user);
   const navigate = useNavigate();
   const location = useLocation();
+  const { trackView, trackCart } = useTrackInteraction();
 
   const skuCode = product?.skuCode ?? '';
   const { data: inventory } = useInventory(skuCode);
   const stock = inventory?.quantity ?? null;
   const outOfStock = stock === null || stock === 0;
+
+  // Track 'view' interaction when the product page mounts (silent — won't block render)
+  useEffect(() => {
+    if (productId) trackView(productId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [productId]);
 
   if (productLoading) {
     return <div className="text-center mt-4 text-muted">Loading product details...</div>;
@@ -77,11 +86,13 @@ export default function ProductDetails() {
     }
     try {
       await addItem({ product, quantity });
+      trackCart(productId);   // Track 'cart' interaction
       addToast(`${quantity}x ${product.name} added to cart`, 'success');
     } catch {
       addToast('Failed to add item to cart', 'error');
     }
   };
+
 
   return (
     <PageTransition>

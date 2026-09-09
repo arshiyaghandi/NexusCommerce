@@ -5,15 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.messaging.contracts.NexusTopics;
 import org.nexuxs.messaging.contracts.event.InventoryFailedEvent;
 import org.nexuxs.order.service.OrderService;
-import org.nexuxs.order.data.model.Order;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * Saga compensation listener: an inventory reservation failure rejects the order.
  * No stock was decremented, so {@link OrderService#applyInventoryFailure(Long)} only
  * needs to move the order to a terminal {@code REJECTED} state.
+ *
+ * <p>The reactive chain is subscribed on {@code boundedElastic} to avoid blocking
+ * Kafka's listener thread — never call {@code block()} inside a {@code @KafkaListener}.
  */
 @Slf4j
 @Component
@@ -32,14 +35,10 @@ public class InventoryFailedEventConsumer {
         log.info("[order] inventory.failed | orderId={} skuCode={} reason={}",
                 event.orderId(), event.skuCode(), event.reason());
 
-        try {
-            Order order = orderService.applyInventoryFailure(event.orderId()).block(java.time.Duration.ofSeconds(30));
-            if (order != null) {
-                log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
-            }
-        } catch (Exception e) {
-            log.error("[order] failed to reject order for orderId={}", event.orderId(), e);
-            throw e;
-        }
+        orderService.applyInventoryFailure(event.orderId())
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(order -> log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus()))
+                .doOnError(e -> log.error("[order] failed to reject order for orderId={}", event.orderId(), e))
+                .subscribe();
     }
 }

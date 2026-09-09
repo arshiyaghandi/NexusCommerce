@@ -5,16 +5,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.nexuxs.messaging.contracts.NexusTopics;
 import org.nexuxs.messaging.contracts.event.PaymentCompletedEvent;
 import org.nexuxs.order.service.OrderService;
-import org.nexuxs.order.data.model.Order;
 import org.springframework.context.annotation.Profile;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
-
-import java.time.Duration;
+import reactor.core.scheduler.Schedulers;
 
 /**
  * Saga listener: closes the order lifecycle by reacting to payment outcomes.
  * A {@code COMPLETED} payment completes the order; anything else cancels it.
+ *
+ * <p>The reactive chain is subscribed on {@code boundedElastic} to avoid blocking
+ * Kafka's listener thread — never call {@code block()} inside a {@code @KafkaListener}.
  */
 @Slf4j
 @Component
@@ -36,14 +37,10 @@ public class PaymentCompletedEventConsumer {
         log.info("[order] payment.completed | orderId={} paymentId={} status={} succeeded={}",
                 event.orderId(), event.paymentId(), event.status(), paymentSucceeded);
 
-        try {
-            Order order = orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded).block(Duration.ofSeconds(30));
-            if (order != null) {
-                log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus());
-            }
-        } catch (Exception e) {
-            log.error("[order] failed to apply payment outcome for orderId={}", event.orderId(), e);
-            throw e;
-        }
+        orderService.applyPaymentOutcome(event.orderId(), paymentSucceeded)
+                .subscribeOn(Schedulers.boundedElastic())
+                .doOnNext(order -> log.info("[order] saga applied | orderId={} -> {}", order.getId(), order.getStatus()))
+                .doOnError(e -> log.error("[order] failed to apply payment outcome for orderId={}", event.orderId(), e))
+                .subscribe();
     }
 }

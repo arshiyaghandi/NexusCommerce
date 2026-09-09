@@ -3,11 +3,13 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-dummy-key-for-recommendation-service'
+# ⚠️  In production set SECRET_KEY via environment variable.
+SECRET_KEY = os.getenv('DJANGO_SECRET_KEY', 'django-insecure-dummy-key-for-recommendation-service')
 
-DEBUG = True
+DEBUG = os.getenv('DJANGO_DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', '*').split(',')
+
 
 INSTALLED_APPS = [
     'django.contrib.admin',
