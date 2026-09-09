@@ -1,14 +1,7 @@
 package org.nexuxs.auth.api;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.ws.rs.core.Response;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.keycloak.admin.client.Keycloak;
-import org.keycloak.admin.client.KeycloakBuilder;
-import org.keycloak.representations.idm.CredentialRepresentation;
-import org.keycloak.representations.idm.RoleRepresentation;
-import org.keycloak.representations.idm.UserRepresentation;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -22,11 +15,11 @@ import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
-import reactor.core.scheduler.Schedulers;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -34,16 +27,10 @@ import java.util.Map;
  * Authentication & Customer Account Management controller:
  * login, logout, register, /me, profile view, profile update, and password change.
  *
- * <p><strong>Security & Architecture notes:</strong>
- * <ul>
- *   <li>ROLE_ADMIN is granted ONLY when Keycloak's {@code realm_access.roles} contains "admin".
- *       There is intentionally NO username-based fallback.</li>
- *   <li>Keycloak admin credentials are injected via environment variables
- *       ({@code KEYCLOAK_ADMIN_USERNAME}, {@code KEYCLOAK_ADMIN_PASSWORD}) — never hardcoded.</li>
- *   <li>Logout revokes the refresh token at Keycloak so the server-side session is invalidated.</li>
- *   <li>Password change verifies the user's current password against Keycloak's token endpoint
- *       before resetting to the new password via the Admin API.</li>
- * </ul>
+ * <p><strong>Pure Reactive WebFlux Architecture:</strong>
+ * Instead of using the blocking Keycloak Admin Client Java SDK (which requires thread-pool offloading),
+ * this implementation communicates with Keycloak's Admin REST APIs completely natively using WebClient,
+ * keeping the entire flow non-blocking and maximizing Netty event loop efficiency.
  */
 @Slf4j
 @RestController
@@ -52,8 +39,8 @@ import java.util.Map;
 public class AuthController {
 
     private static final String CAPTCHA_KEY_PREFIX = "captcha:";
-
     private final ReactiveStringRedisTemplate redisTemplate;
+    private final WebClient webClient = WebClient.builder().build();
 
     // ── Keycloak client config (OAuth2 token endpoint) ────────────────────────
     @Value("${spring.security.oauth2.client.registration.keycloak.client-id}")
@@ -78,21 +65,29 @@ public class AuthController {
     @Value("${nexus.keycloak.admin.password:${KEYCLOAK_ADMIN_PASSWORD:admin}}")
     private String keycloakAdminPassword;
 
-    private Keycloak getKeycloakAdminClient() {
-        return KeycloakBuilder.builder()
-                .serverUrl(keycloakServerUrl)
-                .realm("master")
-                .clientId("admin-cli")
-                .username(keycloakAdminUsername)
-                .password(keycloakAdminPassword)
-                .build();
+    /**
+     * Gets a short-lived admin access token for calling Keycloak Admin REST APIs.
+     */
+    private Mono<String> getAdminAccessToken() {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "password");
+        formData.add("client_id", "admin-cli");
+        formData.add("username", keycloakAdminUsername);
+        formData.add("password", keycloakAdminPassword);
+
+        return webClient.post()
+                .uri(keycloakServerUrl + "/realms/master/protocol/openid-connect/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(formData))
+                .retrieve()
+                .bodyToMono(Map.class)
+                .map(response -> (String) response.get("access_token"));
     }
 
     private List<String> extractRoles(Jwt jwt) {
         List<String> roles = new ArrayList<>();
         if (jwt == null) return roles;
 
-        // 1. Realm roles from Keycloak JWT claim
         Map<String, Object> realmAccess = jwt.getClaim("realm_access");
         if (realmAccess != null && realmAccess.containsKey("roles")) {
             Object rolesObj = realmAccess.get("roles");
@@ -107,7 +102,6 @@ public class AuthController {
             }
         }
 
-        // 2. Client roles (resource_access)
         Map<String, Object> resourceAccess = jwt.getClaim("resource_access");
         if (resourceAccess != null) {
             for (Object clientObj : resourceAccess.values()) {
@@ -141,7 +135,7 @@ public class AuthController {
         formData.add("username", request.getUsername());
         formData.add("password", request.getPassword());
 
-        return WebClient.create().post()
+        return webClient.post()
                 .uri(issuerUri + "/protocol/openid-connect/token")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(formData))
@@ -169,7 +163,7 @@ public class AuthController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Logout — revokes the refresh token at Keycloak, then expires cookies
+    // Logout
     // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/logout")
@@ -183,14 +177,13 @@ public class AuthController {
             revokeForm.add("client_secret", clientSecret);
             revokeForm.add("refresh_token", refreshToken);
 
-            revoke = WebClient.create().post()
+            revoke = webClient.post()
                     .uri(issuerUri + "/protocol/openid-connect/logout")
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                     .body(BodyInserters.fromFormData(revokeForm))
                     .retrieve()
                     .toBodilessEntity()
                     .doOnSuccess(r -> log.info("Keycloak session revoked, status={}", r.getStatusCode()))
-                    .doOnError(e -> log.warn("Failed to revoke Keycloak session: {}", e.getMessage()))
                     .onErrorResume(e -> Mono.empty())
                     .then();
         }
@@ -209,7 +202,7 @@ public class AuthController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // /me — returns the authenticated user's quick profile and roles from JWT
+    // /me
     // ─────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/me")
@@ -239,7 +232,7 @@ public class AuthController {
         String email = jwt.getClaimAsString("email");
         if (email == null || email.isBlank()) email = "No Email";
 
-        Map<String, Object> response = new java.util.HashMap<>();
+        Map<String, Object> response = new HashMap<>();
         response.put("sub", jwt.getSubject());
         response.put("username", username);
         response.put("firstName", firstName != null ? firstName : "");
@@ -252,70 +245,65 @@ public class AuthController {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // GET /profile — fetches live customer profile from Keycloak
+    // GET /profile (Pure Reactive)
     // ─────────────────────────────────────────────────────────────────────────
 
     @GetMapping("/profile")
     public Mono<ResponseEntity<UserProfileResponse>> getProfile(@AuthenticationPrincipal Jwt jwt) {
-        if (jwt == null) {
-            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
-        }
+        if (jwt == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
 
         String userId = jwt.getSubject();
         List<String> roles = extractRoles(jwt);
 
-        return Mono.fromCallable(() -> {
-            try (Keycloak keycloak = getKeycloakAdminClient()) {
-                UserRepresentation user = keycloak.realm(keycloakRealm).users().get(userId).toRepresentation();
+        return getAdminAccessToken()
+                .flatMap(token -> webClient.get()
+                        .uri(keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/users/" + userId)
+                        .header("Authorization", "Bearer " + token)
+                        .retrieve()
+                        .bodyToMono(Map.class))
+                .map(userMap -> {
+                    String firstName = (String) userMap.getOrDefault("firstName", "");
+                    String lastName = (String) userMap.getOrDefault("lastName", "");
+                    String username = (String) userMap.getOrDefault("username", "");
+                    String fullName = (firstName + " " + lastName).trim();
+                    if (fullName.isBlank()) fullName = username;
 
-                String firstName = user.getFirstName() != null ? user.getFirstName() : "";
-                String lastName = user.getLastName() != null ? user.getLastName() : "";
-                String fullName = (firstName + " " + lastName).trim();
-                if (fullName.isBlank()) {
-                    fullName = user.getUsername();
-                }
+                    UserProfileResponse profile = UserProfileResponse.builder()
+                            .id((String) userMap.get("id"))
+                            .username(username)
+                            .firstName(firstName)
+                            .lastName(lastName)
+                            .name(fullName)
+                            .email((String) userMap.getOrDefault("email", ""))
+                            .roles(roles)
+                            .createdTimestamp(((Number) userMap.getOrDefault("createdTimestamp", 0L)).longValue())
+                            .build();
+                    return ResponseEntity.ok(profile);
+                })
+                .onErrorResume(e -> {
+                    log.warn("Failed to fetch live Keycloak profile reactively for userId={}, fallback to JWT: {}", userId, e.getMessage());
+                    String username = jwt.getClaimAsString("preferred_username");
+                    if (username == null || username.isBlank()) username = userId;
+                    String firstName = jwt.getClaimAsString("given_name");
+                    String lastName = jwt.getClaimAsString("family_name");
+                    String name = jwt.getClaimAsString("name");
+                    if (name == null || name.isBlank()) name = username;
 
-                UserProfileResponse profile = UserProfileResponse.builder()
-                        .id(user.getId())
-                        .username(user.getUsername())
-                        .firstName(firstName)
-                        .lastName(lastName)
-                        .name(fullName)
-                        .email(user.getEmail() != null ? user.getEmail() : "")
-                        .roles(roles)
-                        .createdTimestamp(user.getCreatedTimestamp())
-                        .build();
-
-                return ResponseEntity.ok(profile);
-            } catch (Exception e) {
-                log.warn("Failed to fetch live Keycloak profile for userId={}, using JWT fallback: {}", userId, e.getMessage());
-                String username = jwt.getClaimAsString("preferred_username");
-                if (username == null || username.isBlank()) username = userId;
-
-                String firstName = jwt.getClaimAsString("given_name");
-                String lastName = jwt.getClaimAsString("family_name");
-                String name = jwt.getClaimAsString("name");
-                if (name == null || name.isBlank()) {
-                    name = username;
-                }
-
-                UserProfileResponse fallback = UserProfileResponse.builder()
-                        .id(userId)
-                        .username(username)
-                        .firstName(firstName != null ? firstName : "")
-                        .lastName(lastName != null ? lastName : "")
-                        .name(name)
-                        .email(jwt.getClaimAsString("email") != null ? jwt.getClaimAsString("email") : "")
-                        .roles(roles)
-                        .build();
-
-                return ResponseEntity.ok(fallback);
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+                    UserProfileResponse fallback = UserProfileResponse.builder()
+                            .id(userId)
+                            .username(username)
+                            .firstName(firstName != null ? firstName : "")
+                            .lastName(lastName != null ? lastName : "")
+                            .name(name)
+                            .email(jwt.getClaimAsString("email") != null ? jwt.getClaimAsString("email") : "")
+                            .roles(roles)
+                            .build();
+                    return Mono.just(ResponseEntity.ok(fallback));
+                });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PUT /profile — updates customer profile details (first name, last name, email)
+    // PUT /profile (Pure Reactive)
     // ─────────────────────────────────────────────────────────────────────────
 
     @PutMapping("/profile")
@@ -323,46 +311,52 @@ public class AuthController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody UpdateProfileRequest request) {
 
-        if (jwt == null) {
-            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "User not authenticated")));
-        }
-
+        if (jwt == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
         String userId = jwt.getSubject();
 
-        return Mono.fromCallable(() -> {
-            try (Keycloak keycloak = getKeycloakAdminClient()) {
-                UserRepresentation user = keycloak.realm(keycloakRealm).users().get(userId).toRepresentation();
+        return getAdminAccessToken().flatMap(token -> {
+            String userUrl = keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/users/" + userId;
+            // 1. Fetch current user representation
+            return webClient.get()
+                    .uri(userUrl)
+                    .header("Authorization", "Bearer " + token)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .flatMap(userMap -> {
+                        // 2. Modify properties
+                        if (request.getFirstName() != null) userMap.put("firstName", request.getFirstName().trim());
+                        if (request.getLastName() != null) userMap.put("lastName", request.getLastName().trim());
+                        if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                            userMap.put("email", request.getEmail().trim());
+                        }
 
-                if (request.getFirstName() != null) {
-                    user.setFirstName(request.getFirstName().trim());
-                }
-                if (request.getLastName() != null) {
-                    user.setLastName(request.getLastName().trim());
-                }
-                if (request.getEmail() != null && !request.getEmail().isBlank()) {
-                    user.setEmail(request.getEmail().trim());
-                }
-
-                keycloak.realm(keycloakRealm).users().get(userId).update(user);
-                log.info("Profile updated successfully for userId={}", userId);
-
-                return ResponseEntity.ok(Map.<String, Object>of(
-                        "message", "Profile updated successfully",
-                        "firstName", user.getFirstName() != null ? user.getFirstName() : "",
-                        "lastName", user.getLastName() != null ? user.getLastName() : "",
-                        "email", user.getEmail() != null ? user.getEmail() : ""
-                ));
-            } catch (Exception e) {
-                log.error("Failed to update profile for userId={}: {}", userId, e.getMessage());
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                        .body(Map.<String, Object>of("error", "Failed to update profile: " + e.getMessage()));
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+                        // 3. PUT updated representation back
+                        return webClient.put()
+                                .uri(userUrl)
+                                .header("Authorization", "Bearer " + token)
+                                .contentType(MediaType.APPLICATION_JSON)
+                                .bodyValue(userMap)
+                                .retrieve()
+                                .toBodilessEntity()
+                                .map(r -> {
+                                    log.info("Profile updated successfully (reactively) for userId={}", userId);
+                                    return ResponseEntity.ok(Map.<String, Object>of(
+                                            "message", "Profile updated successfully",
+                                            "firstName", userMap.getOrDefault("firstName", ""),
+                                            "lastName", userMap.getOrDefault("lastName", ""),
+                                            "email", userMap.getOrDefault("email", "")
+                                    ));
+                                });
+                    });
+        }).onErrorResume(e -> {
+            log.error("Reactive profile update failed for userId={}: {}", userId, e.getMessage());
+            return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to update profile: " + e.getMessage())));
+        });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // PUT /password — verifies current password and sets new password
+    // PUT /password (Pure Reactive)
     // ─────────────────────────────────────────────────────────────────────────
 
     @PutMapping("/password")
@@ -370,17 +364,13 @@ public class AuthController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody ChangePasswordRequest request) {
 
-        if (jwt == null) {
-            return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "User not authenticated")));
-        }
+        if (jwt == null) return Mono.just(ResponseEntity.status(HttpStatus.UNAUTHORIZED).build());
 
         if (request.getCurrentPassword() == null || request.getCurrentPassword().isBlank()
                 || request.getNewPassword() == null || request.getNewPassword().isBlank()) {
             return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", "Current password and new password are required")));
         }
-
         if (request.getNewPassword().length() < 6) {
             return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("error", "New password must be at least 6 characters long")));
@@ -389,7 +379,7 @@ public class AuthController {
         String username = jwt.getClaimAsString("preferred_username");
         String userId = jwt.getSubject();
 
-        // 1. Verify current password with Keycloak ROPC token endpoint
+        // 1. Verify current password
         MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
         formData.add("grant_type", "password");
         formData.add("client_id", clientId);
@@ -397,49 +387,51 @@ public class AuthController {
         formData.add("username", username);
         formData.add("password", request.getCurrentPassword());
 
-        return WebClient.create().post()
+        return webClient.post()
                 .uri(issuerUri + "/protocol/openid-connect/token")
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(formData))
                 .retrieve()
                 .toBodilessEntity()
-                .flatMap(authResponse -> {
-                    // Current password verified successfully!
-                    // 2. Set new password via Keycloak Admin API
-                    return Mono.fromCallable(() -> {
-                        try (Keycloak keycloak = getKeycloakAdminClient()) {
-                            CredentialRepresentation cred = new CredentialRepresentation();
-                            cred.setType(CredentialRepresentation.PASSWORD);
-                            cred.setValue(request.getNewPassword());
-                            cred.setTemporary(false);
-
-                            keycloak.realm(keycloakRealm).users().get(userId).resetPassword(cred);
-                            log.info("Password changed successfully for username={}, userId={}", username, userId);
-
-                            return ResponseEntity.ok(Map.of("message", "Password changed successfully"));
-                        } catch (Exception e) {
-                            log.error("Failed to reset password in Keycloak for userId={}: {}", userId, e.getMessage());
-                            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                                    .body(Map.of("error", "Failed to update password: " + e.getMessage()));
-                        }
-                    }).subscribeOn(Schedulers.boundedElastic());
+                .onErrorResume(e -> {
+                    log.warn("Current password verification failed for username={}", username);
+                    return Mono.error(new IllegalArgumentException("Current password is incorrect"));
+                })
+                .flatMap(authResponse -> getAdminAccessToken())
+                .flatMap(token -> {
+                    // 2. Reset password via Admin API
+                    Map<String, Object> cred = Map.of(
+                            "type", "password",
+                            "value", request.getNewPassword(),
+                            "temporary", false
+                    );
+                    return webClient.put()
+                            .uri(keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/users/" + userId + "/reset-password")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(cred)
+                            .retrieve()
+                            .toBodilessEntity()
+                            .map(r -> ResponseEntity.ok(Map.of("message", "Password changed successfully")));
                 })
                 .onErrorResume(e -> {
-                    log.warn("Current password verification failed for username={}: {}", username, e.getMessage());
-                    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body(Map.of("error", "Current password is incorrect")));
+                    if (e instanceof IllegalArgumentException) {
+                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", e.getMessage())));
+                    }
+                    log.error("Reactive password reset failed for userId={}: {}", userId, e.getMessage());
+                    return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                            .body(Map.of("error", "Failed to update password: " + e.getMessage())));
                 });
     }
 
     // ─────────────────────────────────────────────────────────────────────────
-    // Register
+    // POST /register (Pure Reactive)
     // ─────────────────────────────────────────────────────────────────────────
 
     @PostMapping("/register")
     public Mono<ResponseEntity<Map<String, String>>> register(@RequestBody RegisterRequest request) {
         if (request.getCaptchaId() == null || request.getCaptchaAnswer() == null) {
-            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(Map.of("error", "Captcha is required")));
+            return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Captcha is required")));
         }
 
         String captchaKey = CAPTCHA_KEY_PREFIX + request.getCaptchaId();
@@ -447,61 +439,79 @@ public class AuthController {
                 .flatMap(storedAnswer -> {
                     redisTemplate.delete(captchaKey).subscribe();
                     if (!storedAnswer.equals(request.getCaptchaAnswer().trim())) {
-                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                                .body(Map.of("error", "Incorrect captcha answer. Please try again.")));
+                        return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Incorrect captcha answer. Please try again.")));
                     }
                     return registerUser(request);
                 })
-                .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("error", "Captcha expired or invalid. Please refresh."))));
+                .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Captcha expired or invalid. Please refresh."))));
     }
 
     private Mono<ResponseEntity<Map<String, String>>> registerUser(RegisterRequest request) {
-        return Mono.fromCallable(() -> {
-            try (Keycloak keycloak = getKeycloakAdminClient()) {
-                UserRepresentation user = new UserRepresentation();
-                user.setUsername(request.getUsername());
-                user.setEnabled(true);
-
-                if (request.getEmail() != null && !request.getEmail().isBlank()) {
-                    user.setEmail(request.getEmail());
-                    user.setEmailVerified(true);
-                }
-                if (request.getFirstName() != null && !request.getFirstName().isBlank()) {
-                    user.setFirstName(request.getFirstName());
-                }
-                if (request.getLastName() != null && !request.getLastName().isBlank()) {
-                    user.setLastName(request.getLastName());
-                }
-
-                CredentialRepresentation cred = new CredentialRepresentation();
-                cred.setType(CredentialRepresentation.PASSWORD);
-                cred.setValue(request.getPassword());
-                cred.setTemporary(false);
-                user.setCredentials(Collections.singletonList(cred));
-
-                Response response = keycloak.realm(keycloakRealm).users().create(user);
-
-                if (response.getStatus() == 201) {
-                    String userId = response.getLocation().getPath().replaceAll(".*/([^/]+)$", "$1");
-                    try {
-                        RoleRepresentation userRole = keycloak.realm(keycloakRealm).roles().get("user").toRepresentation();
-                        keycloak.realm(keycloakRealm).users().get(userId).roles().realmLevel().add(Collections.singletonList(userRole));
-                    } catch (Exception roleEx) {
-                        log.warn("User created but role assignment failed: {}", roleEx.getMessage());
+        return getAdminAccessToken()
+                .flatMap(token -> {
+                    Map<String, Object> user = new HashMap<>();
+                    user.put("username", request.getUsername());
+                    user.put("enabled", true);
+                    if (request.getEmail() != null && !request.getEmail().isBlank()) {
+                        user.put("email", request.getEmail());
+                        user.put("emailVerified", true);
                     }
-                    return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User created successfully"));
-                } else if (response.getStatus() == 409) {
-                    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Username already exists. Please choose a different one."));
-                } else {
-                    String body = "";
-                    try { body = response.readEntity(String.class); } catch (Exception ignored) {}
-                    return ResponseEntity.status(response.getStatus()).body(Map.of("error", "Registration failed: " + body));
-                }
-            } catch (Exception e) {
-                log.error("Registration error", e);
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal error: " + e.getMessage()));
-            }
-        }).subscribeOn(Schedulers.boundedElastic());
+                    if (request.getFirstName() != null) user.put("firstName", request.getFirstName());
+                    if (request.getLastName() != null) user.put("lastName", request.getLastName());
+
+                    Map<String, Object> cred = Map.of(
+                            "type", "password",
+                            "value", request.getPassword(),
+                            "temporary", false
+                    );
+                    user.put("credentials", List.of(cred));
+
+                    return webClient.post()
+                            .uri(keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/users")
+                            .header("Authorization", "Bearer " + token)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .bodyValue(user)
+                            .retrieve()
+                            .toBodilessEntity()
+                            .flatMap(response -> {
+                                if (response.getStatusCode() == HttpStatus.CREATED) {
+                                    String location = response.getHeaders().getFirst("Location");
+                                    if (location != null) {
+                                        String userId = location.substring(location.lastIndexOf('/') + 1);
+                                        return assignRoleToUser(token, userId, "user")
+                                                .thenReturn(ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User created successfully")));
+                                    }
+                                    return Mono.just(ResponseEntity.status(HttpStatus.CREATED).body(Map.of("message", "User created successfully")));
+                                }
+                                return Mono.just(ResponseEntity.status(response.getStatusCode()).body(Map.of("error", "Registration failed")));
+                            })
+                            .onErrorResume(e -> {
+                                if (e instanceof WebClientResponseException.Conflict) {
+                                    return Mono.just(ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of("error", "Username already exists. Please choose a different one.")));
+                                }
+                                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Internal error: " + e.getMessage())));
+                            });
+                });
+    }
+
+    private Mono<Void> assignRoleToUser(String adminToken, String userId, String roleName) {
+        return webClient.get()
+                .uri(keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/roles/" + roleName)
+                .header("Authorization", "Bearer " + adminToken)
+                .retrieve()
+                .bodyToMono(Map.class)
+                .flatMap(roleMap -> webClient.post()
+                        .uri(keycloakServerUrl + "/admin/realms/" + keycloakRealm + "/users/" + userId + "/role-mappings/realm")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(List.of(roleMap))
+                        .retrieve()
+                        .toBodilessEntity()
+                )
+                .then()
+                .onErrorResume(e -> {
+                    log.warn("Failed to assign role to user {}: {}", userId, e.getMessage());
+                    return Mono.empty();
+                });
     }
 }
