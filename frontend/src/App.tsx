@@ -18,6 +18,7 @@ const ProductDetails = lazy(() => import('./pages/ProductDetails'));
 const Cart = lazy(() => import('./pages/Cart'));
 const Checkout = lazy(() => import('./pages/Checkout'));
 const Orders = lazy(() => import('./pages/Orders'));
+const Profile = lazy(() => import('./pages/Profile'));
 const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
 
 const queryClient = new QueryClient({
@@ -80,7 +81,9 @@ export default function App() {
                         <Route path="cart" element={<Cart />} />
                         <Route path="checkout" element={<Checkout />} />
                         <Route path="orders" element={<Orders />} />
+                        <Route path="profile" element={<Profile />} />
                       </Route>
+
 
                       {/*
                         Admin routes — require ROLE_ADMIN.

@@ -77,10 +77,37 @@ export interface RegisterRequest {
 }
 
 export interface AuthUser {
+  sub?: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
   name: string;
   email: string;
   roles: string[];
 }
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  firstName: string;
+  lastName: string;
+  name: string;
+  email: string;
+  roles: string[];
+  createdTimestamp?: number;
+}
+
+export interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+}
+
+export interface ChangePasswordRequest {
+  currentPassword: string;
+  newPassword: string;
+}
+
 
 export interface Transaction {
   id: number;

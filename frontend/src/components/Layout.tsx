@@ -133,18 +133,20 @@ export default function Layout() {
                     )}
                   </AnimatePresence>
                 </Link>
-                <div
+                <Link
+                  to="/profile"
                   className="nav-link"
+                  title="Manage Profile & Security"
                   style={{
                     display: 'flex',
                     alignItems: 'center',
                     gap: '0.4rem',
-                    color: 'var(--accent-secondary)',
-                    cursor: 'default',
+                    color: location.pathname === '/profile' ? 'var(--accent-primary)' : 'var(--accent-secondary)',
+                    fontWeight: location.pathname === '/profile' ? '600' : 'normal',
                   }}
                 >
-                  <User size={18} /> {user?.name || 'User'}
-                </div>
+                  <User size={18} /> {user?.name || 'Profile'}
+                </Link>
                 <button
                   onClick={handleLogout}
                   className="btn btn-outline"
@@ -203,7 +205,11 @@ export default function Layout() {
               <Link to="/" className="text-muted" style={{ textDecoration: 'none' }}>Home</Link>
               <Link to="/products" className="text-muted" style={{ textDecoration: 'none' }}>Products</Link>
               {user ? (
-                <Link to="/cart" className="text-muted" style={{ textDecoration: 'none' }}>Cart</Link>
+                <>
+                  <Link to="/profile" className="text-muted" style={{ textDecoration: 'none' }}>Profile</Link>
+                  <Link to="/orders" className="text-muted" style={{ textDecoration: 'none' }}>Orders</Link>
+                  <Link to="/cart" className="text-muted" style={{ textDecoration: 'none' }}>Cart</Link>
+                </>
               ) : (
                 <Link to="/register" className="text-muted" style={{ textDecoration: 'none' }}>Get Started</Link>
               )}
